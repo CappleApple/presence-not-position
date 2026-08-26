@@ -196,6 +196,11 @@ enabled = true
 showMode = "ONCE"
 cooldownSeconds = 0
 
+[titleLayout]
+x = 0
+y = 0
+spacing = 2
+
 [custom]
 enabled = true
 
@@ -208,6 +213,8 @@ dimensionMusic = true
 vanillaMusicBehavior = "REPLACE"
 vanillaMusicDuckVolume = 0.15
 ```
+
+Title layout coordinates are signed offsets from the GUI's top center in scaled pixels. `x = 0` horizontally centers every title, while `y = 0` places the top of the first title row at the top edge; positive values move right/down and negative values move left/up. `spacing` controls the empty pixels between rows when titles stack; extremely dense stacks reduce it only as needed to retain their compact height.
 
 `ALWAYS` shows every legitimate re-entry, `COOLDOWN` is tracked per registry ID, and `ONCE` shows each ID once. History is cosmetic client state in `config/presence-not-position-history.json` and persists across restarts. Title and music category toggles are independent.
 

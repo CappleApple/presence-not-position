@@ -30,13 +30,14 @@ class PresentationStackLayoutTest {
     }
 
     @Test
-    void everyRowFitsInsideTheTopThirdAndRemainsCompact() {
+    void defaultStackStartsAtTheTopAndRemainsCompact() {
         for (int screenHeight : List.of(90, 240, 480, 1080)) {
             for (int count = 1; count <= 12; count++) {
                 List<PresentationStackLayout.Row> rows = PresentationStackLayout.rows(screenHeight, count);
                 assertEquals(count, rows.size());
-                assertTrue(rows.get(rows.size() - 1).bottom() <= screenHeight / 3,
-                    "stack escaped top third for height=" + screenHeight + " count=" + count);
+                assertEquals(0, rows.get(0).top());
+                assertTrue(rows.get(rows.size() - 1).bottom() - rows.get(0).top() <= screenHeight / 3,
+                    "stack exceeded compact height for height=" + screenHeight + " count=" + count);
                 for (int index = 1; index < rows.size(); index++) {
                     assertTrue(rows.get(index - 1).center() < rows.get(index).center());
                     assertTrue(rows.get(index - 1).height() >= rows.get(index).height());
@@ -46,9 +47,27 @@ class PresentationStackLayoutTest {
     }
 
     @Test
+    void configuredTopOffsetAndSpacingAreAppliedToTheWholeStack() {
+        List<PresentationStackLayout.Row> rows = PresentationStackLayout.rows(240, 3, 42, 7);
+
+        assertEquals(42, rows.get(0).top());
+        assertEquals(7, rows.get(1).top() - rows.get(0).bottom());
+        assertEquals(7, rows.get(2).top() - rows.get(1).bottom());
+    }
+
+    @Test
+    void horizontalAnchorAppliesSignedOffsetFromCenter() {
+        assertEquals(160, PresentationStackLayout.horizontalAnchor(320, 0));
+        assertEquals(187, PresentationStackLayout.horizontalAnchor(320, 27));
+        assertEquals(133, PresentationStackLayout.horizontalAnchor(320, -27));
+    }
+
+    @Test
     void rejectsInvalidLayoutInputs() {
         assertTrue(PresentationStackLayout.rows(240, 0).isEmpty());
         assertThrows(IllegalArgumentException.class, () -> PresentationStackLayout.rows(0, 1));
         assertThrows(IllegalArgumentException.class, () -> PresentationStackLayout.rows(240, -1));
+        assertThrows(IllegalArgumentException.class, () -> PresentationStackLayout.rows(240, 1, 2, -1));
+        assertThrows(IllegalArgumentException.class, () -> PresentationStackLayout.horizontalAnchor(0, 0));
     }
 }

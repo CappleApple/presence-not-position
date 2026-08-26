@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2 - 2026-08-26
+
+### Added
+
+- Client title-layout settings for the title stack's top-center-relative X/Y offsets and spacing between simultaneous titles.
+
 ## 1.0.1 - 2026-08-25
 
 ### Changed

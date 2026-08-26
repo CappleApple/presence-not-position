@@ -6,6 +6,8 @@ import java.util.List;
 
 /** Pure layout policy for simultaneous location-title batches. */
 public final class PresentationStackLayout {
+    public static final int DEFAULT_SPACING = 2;
+
     private PresentationStackLayout() {
     }
 
@@ -24,14 +26,19 @@ public final class PresentationStackLayout {
     }
 
     public static List<Row> rows(int screenHeight, int count) {
+        return rows(screenHeight, count, 0, DEFAULT_SPACING);
+    }
+
+    public static List<Row> rows(int screenHeight, int count, int offsetY, int spacing) {
         if (screenHeight < 1) throw new IllegalArgumentException("screen height must be positive");
         if (count < 0) throw new IllegalArgumentException("presentation count must be non-negative");
+        if (spacing < 0) throw new IllegalArgumentException("title spacing must be non-negative");
         if (count == 0) return List.of();
 
         int regionBottom = Math.max(1, screenHeight / 3);
         int topMargin = Math.max(2, Math.min(6, regionBottom / 12));
-        int gap = count == 1 ? 0 : 2;
-        if (topMargin + count + gap * (count - 1) > regionBottom) gap = 0;
+        int maxCompactGap = count == 1 ? 0 : Math.max(0, (regionBottom - topMargin - count) / (count - 1));
+        int gap = Math.min(spacing, maxCompactGap);
 
         float weightSum = 0.0F;
         for (int index = 0; index < count; index++) weightSum += scaleForIndex(index);
@@ -40,14 +47,24 @@ public final class PresentationStackLayout {
         float baseHeight = Math.min(desiredBaseHeight, availableHeight / weightSum);
 
         List<Row> rows = new ArrayList<>(count);
-        int top = topMargin;
+        long top = offsetY;
         for (int index = 0; index < count; index++) {
             float scale = scaleForIndex(index);
             int height = Math.max(1, (int) Math.floor(baseHeight * scale));
-            rows.add(new Row(top, height, scale));
+            rows.add(new Row(saturatedInt(top), height, scale));
             top += height + gap;
         }
         return List.copyOf(rows);
+    }
+
+    public static int horizontalAnchor(int screenWidth, int offsetX) {
+        if (screenWidth < 1) throw new IllegalArgumentException("screen width must be positive");
+        return saturatedInt((long) screenWidth / 2 + offsetX);
+    }
+
+    private static int saturatedInt(long value) {
+        if (value > Integer.MAX_VALUE) return Integer.MAX_VALUE;
+        return value < Integer.MIN_VALUE ? Integer.MIN_VALUE : (int) value;
     }
 
     public record Row(int top, int height, float scale) {

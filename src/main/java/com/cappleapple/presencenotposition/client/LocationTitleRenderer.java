@@ -1,5 +1,6 @@
 package com.cappleapple.presencenotposition.client;
 
+import com.cappleapple.presencenotposition.config.ClientConfig;
 import com.cappleapple.presencenotposition.presentation.AnimationDefinition;
 import com.cappleapple.presencenotposition.presentation.PresentationStackLayout;
 import com.cappleapple.presencenotposition.presentation.VisualDefinition;
@@ -21,7 +22,10 @@ public final class LocationTitleRenderer {
         if (activePresentations.isEmpty()) return;
         float partial = event.getPartialTick().getGameTimeDeltaPartialTick(true);
         GuiGraphics graphics = event.getGuiGraphics();
-        List<PresentationStackLayout.Row> rows = PresentationStackLayout.rows(graphics.guiHeight(), activePresentations.size());
+        int titleX = PresentationStackLayout.horizontalAnchor(graphics.guiWidth(), ClientConfig.TITLE_X.get());
+        List<PresentationStackLayout.Row> rows = PresentationStackLayout.rows(
+            graphics.guiHeight(), activePresentations.size(), ClientConfig.TITLE_Y.get(), ClientConfig.TITLE_SPACING.get()
+        );
         for (int index = 0; index < activePresentations.size(); index++) {
             ClientPresentationManager.Active active = activePresentations.get(index);
             PresentationStackLayout.Row row = rows.get(index);
@@ -37,19 +41,20 @@ public final class LocationTitleRenderer {
                 VisualDefinition visual = active.definition().title().visual();
                 boolean renderedTexture = switch (visual.type()) {
                     case TEXT -> false;
-                    case TEXTURE -> renderSpritesheet(graphics, visual, active.elapsedTicks(), alpha, contentCenterY, contentHeight, sizeScale);
-                    case FRAMES -> renderFrames(graphics, visual, active.elapsedTicks(), alpha, contentCenterY, contentHeight, sizeScale);
+                    case TEXTURE -> renderSpritesheet(graphics, visual, active.elapsedTicks(), alpha, titleX, contentCenterY, contentHeight, sizeScale);
+                    case FRAMES -> renderFrames(graphics, visual, active.elapsedTicks(), alpha, titleX, contentCenterY, contentHeight, sizeScale);
                 };
-                if (!renderedTexture) renderText(graphics, active, alpha, contentCenterY, contentHeight, sizeScale);
+                if (!renderedTexture) renderText(graphics, active, alpha, titleX, contentCenterY, contentHeight, sizeScale);
                 if (active.subtitle() != null) {
-                    renderSubtitle(graphics, active, alpha, row.top() + contentHeight + subtitleGap, subtitleScale);
+                    renderSubtitle(graphics, active, alpha, titleX, row.top() + contentHeight + subtitleGap, subtitleScale);
                 }
             }
         }
     }
 
     private static boolean renderSpritesheet(
-        GuiGraphics graphics, VisualDefinition visual, int elapsed, float alpha, int centerY, int rowHeight, float sizeScale
+        GuiGraphics graphics, VisualDefinition visual, int elapsed, float alpha,
+        int centerX, int centerY, int rowHeight, float sizeScale
     ) {
         ResourceLocation texture = visual.texture();
         TextureSize size = ClientResourceIndex.snapshot().textureSizes().get(texture);
@@ -64,31 +69,33 @@ public final class LocationTitleRenderer {
         if (frameWidth < 1 || frameHeight < 1) return false;
         int u = horizontal ? frame * frameWidth : 0;
         int v = horizontal ? 0 : frame * frameHeight;
-        drawTexture(graphics, texture, size, frameWidth, frameHeight, u, v, alpha, centerY, rowHeight, sizeScale);
+        drawTexture(graphics, texture, size, frameWidth, frameHeight, u, v, alpha, centerX, centerY, rowHeight, sizeScale);
         return true;
     }
 
     private static boolean renderFrames(
-        GuiGraphics graphics, VisualDefinition visual, int elapsed, float alpha, int centerY, int rowHeight, float sizeScale
+        GuiGraphics graphics, VisualDefinition visual, int elapsed, float alpha,
+        int centerX, int centerY, int rowHeight, float sizeScale
     ) {
         int frame = visual.animation().frameAt(elapsed);
         if (frame >= visual.frames().size()) frame = visual.frames().size() - 1;
         ResourceLocation texture = visual.frames().get(frame);
         TextureSize size = ClientResourceIndex.snapshot().textureSizes().get(texture);
         if (size == null) return false;
-        drawTexture(graphics, texture, size, size.width(), size.height(), 0, 0, alpha, centerY, rowHeight, sizeScale);
+        drawTexture(graphics, texture, size, size.width(), size.height(), 0, 0, alpha, centerX, centerY, rowHeight, sizeScale);
         return true;
     }
 
     private static void drawTexture(
         GuiGraphics graphics, ResourceLocation texture, TextureSize fullSize,
-        int frameWidth, int frameHeight, int u, int v, float alpha, int centerY, int rowHeight, float sizeScale
+        int frameWidth, int frameHeight, int u, int v, float alpha,
+        int centerX, int centerY, int rowHeight, float sizeScale
     ) {
         float scale = Math.min((graphics.guiWidth() * 0.65F * sizeScale) / frameWidth, (rowHeight - 4.0F) / frameHeight);
         scale = Math.min(scale, 1.0F);
         int width = Math.max(1, Math.round(frameWidth * scale));
         int height = Math.max(1, Math.round(frameHeight * scale));
-        int x = (graphics.guiWidth() - width) / 2;
+        int x = (int) Math.floor(centerX - width / 2.0F);
         int y = centerY - height / 2;
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -98,25 +105,26 @@ public final class LocationTitleRenderer {
     }
 
     private static void renderText(
-        GuiGraphics graphics, ClientPresentationManager.Active active, float alpha, int centerY, int contentHeight, float sizeScale
+        GuiGraphics graphics, ClientPresentationManager.Active active, float alpha,
+        int centerX, int centerY, int contentHeight, float sizeScale
     ) {
         Minecraft minecraft = Minecraft.getInstance();
         int color = ((int) (alpha * 255.0F) << 24) | 0xFFFFFF;
         float textScale = Math.min(1.65F * sizeScale, contentHeight / (float) minecraft.font.lineHeight);
         graphics.pose().pushPose();
-        graphics.pose().translate(graphics.guiWidth() / 2.0F, centerY, 0.0F);
+        graphics.pose().translate(centerX, centerY, 0.0F);
         graphics.pose().scale(textScale, textScale, 1.0F);
         graphics.drawString(minecraft.font, active.title(), -minecraft.font.width(active.title()) / 2, -minecraft.font.lineHeight / 2, color, true);
         graphics.pose().popPose();
     }
 
     private static void renderSubtitle(
-        GuiGraphics graphics, ClientPresentationManager.Active active, float alpha, int y, float scale
+        GuiGraphics graphics, ClientPresentationManager.Active active, float alpha, int centerX, int y, float scale
     ) {
         Minecraft minecraft = Minecraft.getInstance();
         int color = ((int) (alpha * 255.0F) << 24) | 0xFFFFFF;
         graphics.pose().pushPose();
-        graphics.pose().translate(graphics.guiWidth() / 2.0F, y, 0.0F);
+        graphics.pose().translate(centerX, y, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.drawString(minecraft.font, active.subtitle(), -minecraft.font.width(active.subtitle()) / 2, 0, color, true);
         graphics.pose().popPose();

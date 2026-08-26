@@ -17,6 +17,9 @@ public final class ClientConfig {
 
     public static final ModConfigSpec SPEC;
     private static final Map<LocationType, TitleCategory> TITLES = new EnumMap<>(LocationType.class);
+    public static final ModConfigSpec.IntValue TITLE_X;
+    public static final ModConfigSpec.IntValue TITLE_Y;
+    public static final ModConfigSpec.IntValue TITLE_SPACING;
     public static final ModConfigSpec.BooleanValue CUSTOM_PRESENTATIONS;
     public static final ModConfigSpec.BooleanValue MUSIC_ENABLED;
     public static final ModConfigSpec.DoubleValue MUSIC_MASTER_VOLUME;
@@ -31,6 +34,17 @@ public final class ClientConfig {
         addTitleCategory(builder, LocationType.STRUCTURE, true, ShowMode.COOLDOWN, 300);
         addTitleCategory(builder, LocationType.BIOME, true, ShowMode.COOLDOWN, 600);
         addTitleCategory(builder, LocationType.DIMENSION, true, ShowMode.ONCE, 0);
+        builder.push("titleLayout");
+        TITLE_X = builder.comment(
+            "Signed horizontal offset from the top-center origin in scaled GUI pixels. 0 is centered."
+        ).defineInRange("x", 0, -Short.MAX_VALUE, Short.MAX_VALUE);
+        TITLE_Y = builder.comment(
+            "Signed vertical offset from the top-center origin to the top of the first title row, in scaled GUI pixels."
+        ).defineInRange("y", 0, -Short.MAX_VALUE, Short.MAX_VALUE);
+        TITLE_SPACING = builder.comment(
+            "Empty scaled GUI pixels between simultaneously stacked title rows."
+        ).defineInRange("spacing", 2, 0, Short.MAX_VALUE);
+        builder.pop();
         builder.push("custom");
         CUSTOM_PRESENTATIONS = builder.comment("Applies when a scripted custom presentation respects client policy.")
             .define("enabled", true);
