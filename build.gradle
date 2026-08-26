@@ -1,0 +1,177 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.143'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    maven {
+        name = 'LatvianMods'
+        url = 'https://maven.latvian.dev/releases'
+        content {
+            includeGroup 'dev.latvian.mods'
+            includeGroup 'dev.latvian.apps'
+        }
+    }
+    maven {
+        name = 'LatvianModsMirror'
+        url = 'https://maven.latvian.dev/mirror'
+        content { includeGroup 'com.github.rtyley' }
+    }
+}
+
+configurations {
+    localRuntime
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        configureEach {
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        client {
+            client()
+            gameDirectory = project.layout.projectDirectory.dir('run-client')
+            if (project.hasProperty('quickPlayServer')) {
+                programArguments.addAll '--quickPlayMultiplayer', project.property('quickPlayServer').toString()
+            }
+        }
+
+        server {
+            server()
+            gameDirectory = project.layout.projectDirectory.dir('run-server')
+            programArgument '--nogui'
+        }
+
+        serverKubeJS {
+            server()
+            gameDirectory = project.layout.projectDirectory.dir('run-kubejs')
+            programArgument '--nogui'
+        }
+
+        gameTestServer {
+            type = 'gameTestServer'
+            gameDirectory = project.layout.projectDirectory.dir('run-gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', "${project.mod_id},minecraft"
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
+}
+
+dependencies {
+    compileOnly "dev.latvian.mods:kubejs-neoforge:${kubejs_version}"
+    compileOnly "dev.latvian.mods:rhino:${rhino_version}"
+
+    if (providers.gradleProperty('withKubeJS').getOrElse('false').toBoolean()) {
+        localRuntime "dev.latvian.mods:kubejs-neoforge:${kubejs_version}"
+        localRuntime "dev.latvian.mods:rhino:${rhino_version}"
+    }
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+}
+
+tasks.named('jar', Jar).configure {
+    includeEmptyDirs = false
+    from('LICENSE') {
+        into('META-INF')
+        rename { 'LICENSE_presencenotposition' }
+    }
+}
+
+def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def replaceProperties = [
+        minecraft_version: minecraft_version,
+        minecraft_version_range: minecraft_version_range,
+        neo_version: neo_version,
+        loader_version_range: loader_version_range,
+        mod_id: mod_id,
+        mod_name: mod_name,
+        mod_license: mod_license,
+        mod_version: mod_version
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
+}
+
+def releaseJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+tasks.register('verifyReleaseJarContents') {
+    dependsOn tasks.named('jar')
+    inputs.file(releaseJar)
+    doLast {
+        def required = [
+            'META-INF/neoforge.mods.toml',
+            'presencenotposition.mixins.json',
+            'assets/presencenotposition/lang/en_us.json',
+            'kubejs.plugins.txt',
+            'com/cappleapple/presencenotposition/PresenceNotPosition.class',
+            'com/cappleapple/presencenotposition/client/PresenceNotPositionClient.class',
+            'com/cappleapple/presencenotposition/integration/kubejs/PresenceKubeJSPlugin.class'
+        ]
+        def zip = new java.util.zip.ZipFile(releaseJar.get().asFile)
+        try {
+            def missing = required.findAll { zip.getEntry(it) == null }
+            if (!missing.empty) throw new GradleException("Release JAR is missing required entries: ${missing}")
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyReleaseJarContents')
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

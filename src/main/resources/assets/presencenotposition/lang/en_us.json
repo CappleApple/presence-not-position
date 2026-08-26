@@ -1,0 +1,15 @@
+{
+  "commands.presencenotposition.current.dimension": "Current Dimension: %s",
+  "commands.presencenotposition.current.biome": "Current Biome: %s",
+  "commands.presencenotposition.current.structures": "Current Structures: %s",
+  "commands.presencenotposition.debug.enabled": "Presence Not Position debug output enabled",
+  "commands.presencenotposition.debug.disabled": "Presence Not Position debug output disabled",
+  "commands.presencenotposition.title.sent": "Sent presentation for %s %s",
+  "commands.presencenotposition.music.none": "No Presence Not Position music is active",
+  "commands.presencenotposition.music.current": "Winning Music: %s; Track: %s",
+  "commands.presencenotposition.music.next": "Skipped to the next Presence Not Position track",
+  "commands.presencenotposition.music.stop": "Stopped Presence Not Position music",
+  "commands.presencenotposition.music.reload": "Reloading resource packs",
+  "commands.presencenotposition.history": "Presentation history contains %s location(s)",
+  "commands.presencenotposition.history.cleared": "Presentation history cleared"
+}
