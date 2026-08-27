@@ -7,6 +7,7 @@ import com.cappleapple.presencenotposition.location.LocationContext;
 import com.cappleapple.presencenotposition.location.LocationType;
 import com.cappleapple.presencenotposition.network.PresentationPayload;
 import com.cappleapple.presencenotposition.presentation.EntrySoundDefinition;
+import com.cappleapple.presencenotposition.presentation.EntrySoundSelector;
 import com.cappleapple.presencenotposition.presentation.PresentationDefinition;
 import com.cappleapple.presencenotposition.presentation.PresentationOverride;
 import com.cappleapple.presencenotposition.presentation.PresentationPolicy;
@@ -78,22 +79,27 @@ public final class ClientPresentationManager {
         QUEUE.removeIf(pending -> pending.enqueuedTick() == enqueuedTick);
         PresenceNotPosition.LOGGER.info("Starting presentation stack in top-to-bottom order: {}",
             batch.stream().map(Pending::context).toList());
-        batch.forEach(ClientPresentationManager::start);
+        List<EntrySoundSelector.Candidate> sounds = batch.stream()
+            .map(ClientPresentationManager::start)
+            .map(active -> new EntrySoundSelector.Candidate(active.definition().entrySound(), active.override()))
+            .toList();
+        EntrySoundSelector.select(sounds).ifPresent(ClientPresentationManager::playEntrySound);
     }
 
-    private static void start(Pending pending) {
+    private static Active start(Pending pending) {
         PresentationDefinition definition = definition(pending.context());
         TitleDefinition base = definition.title();
         int duration = pending.override().durationTicks() == null ? base.durationTicks() : pending.override().durationTicks();
         Component title = pending.override().title() != null ? pending.override().title() : title(pending.context(), base);
         Component subtitle = pending.override().subtitle() != null ? pending.override().subtitle() : subtitle(base);
         long end = clientTick + duration;
-        ACTIVE.add(new Active(pending.context(), definition, pending.override(), title, subtitle, clientTick, end));
+        Active active = new Active(pending.context(), definition, pending.override(), title, subtitle, clientTick, end);
+        ACTIVE.add(active);
         MUSIC_NOT_BEFORE.put(pending.context(), end);
         if (pending.context().type() != LocationType.CUSTOM) {
             PresentationHistory.record(pending.context(), Instant.now().getEpochSecond());
         }
-        playEntrySound(definition.entrySound(), pending.override());
+        return active;
     }
 
     private static boolean allowed(LocationContext context, PresentationOverride override) {
@@ -124,12 +130,9 @@ public final class ClientPresentationManager {
         return definition.subtitle() == null ? null : Component.literal(definition.subtitle());
     }
 
-    private static void playEntrySound(@Nullable EntrySoundDefinition definition, PresentationOverride override) {
-        if (definition == null && override.sound() == null) return;
-        var id = override.sound() != null ? override.sound() : definition.id();
-        float volume = definition == null ? 1.0F : definition.volume();
-        float pitch = definition == null ? 1.0F : definition.pitch();
-        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvent.createVariableRangeEvent(id), pitch, volume));
+    private static void playEntrySound(EntrySoundDefinition sound) {
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(
+            SoundEvent.createVariableRangeEvent(sound.id()), sound.pitch(), sound.volume()));
     }
 
     public static long musicNotBefore(LocationContext context) {

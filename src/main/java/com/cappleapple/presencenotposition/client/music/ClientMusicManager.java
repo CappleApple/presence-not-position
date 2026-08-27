@@ -7,6 +7,7 @@ import com.cappleapple.presencenotposition.music.DayPeriod;
 import com.cappleapple.presencenotposition.music.MusicChoice;
 import com.cappleapple.presencenotposition.music.MusicContextResolver;
 import com.cappleapple.presencenotposition.music.MusicDefinition;
+import com.cappleapple.presencenotposition.music.MusicPlaybackTiming;
 import com.cappleapple.presencenotposition.music.NormalizationMetadata;
 import com.cappleapple.presencenotposition.music.TrackSelector;
 import com.cappleapple.presencenotposition.network.ContextPayload;
@@ -32,6 +33,7 @@ public final class ClientMusicManager {
     private static final Map<SelectorKey, TrackSelector> SELECTORS = new HashMap<>();
     private static final Map<SelectorKey, Playback> SUSPENDED = new HashMap<>();
     private static final List<Playback> FADING = new ArrayList<>();
+    private static final MusicPlaybackTiming PLAYBACK_TIMING = new MusicPlaybackTiming();
     private static DayPeriod period;
     private static DayPeriod periodCandidate;
     private static long periodCandidateSince;
@@ -41,6 +43,7 @@ public final class ClientMusicManager {
     private static Playback primary;
     private static long scheduledStartTick = Long.MAX_VALUE;
     private static long nextTrackTick = Long.MAX_VALUE;
+    private static boolean waitingForTitle;
     private static long resourceRevision = -1;
     private static boolean manualStop;
 
@@ -78,16 +81,19 @@ public final class ClientMusicManager {
         tickFades(minecraft, tick);
         removeFinishedSuspended(minecraft);
 
-        if (!manualStop && winner != null && tick >= scheduledStartTick && !sameChoice(primary, winner)) {
-            transitionTo(winner, minecraft, tick, resources);
-        }
-        if (!manualStop && winner != null && primary == null && tick >= nextTrackTick && !winner.silence()) {
-            startNewPlayback(winner, minecraft, tick, resources, false);
-        }
         if (primary != null && tick - primary.startedTick > 10 && !minecraft.getSoundManager().isActive(primary.sound)) {
             MusicChoice finishedChoice = primary.choice;
             primary = null;
-            nextTrackTick = tick + finishedChoice.definition().trackDelay().randomTicks(RANDOM);
+            nextTrackTick = PLAYBACK_TIMING.afterPlaybackEnd(tick,
+                finishedChoice.definition().trackDelay().randomTicks(RANDOM),
+                ClientConfig.musicCooldownSeconds(finishedChoice.context().type()));
+        }
+        if (!manualStop && winner != null && tick >= scheduledStartTick && !sameChoice(primary, winner)) {
+            transitionTo(winner, minecraft, tick, resources);
+        }
+        if (!manualStop && winner != null && primary == null && scheduledStartTick == Long.MAX_VALUE
+            && !waitingForTitle && tick >= nextTrackTick && !winner.silence()) {
+            startNewPlayback(winner, minecraft, tick, resources, false);
         }
         VanillaMusicController.tick(winner != null && !manualStop);
     }
@@ -125,23 +131,31 @@ public final class ClientMusicManager {
         winner = next;
         resolvedCandidate = null;
         if (next == null) {
+            waitingForTitle = false;
             scheduledStartTick = Long.MAX_VALUE;
             fadePrimary(false, tick);
             nextTrackTick = Long.MAX_VALUE;
             return;
         }
+        if (sameChoice(primary, next)) {
+            waitingForTitle = false;
+            scheduledStartTick = Long.MAX_VALUE;
+            return;
+        }
         long titleEnd = next.definition().startAfterTitle()
             ? com.cappleapple.presencenotposition.client.ClientPresentationManager.musicNotBefore(next.context())
             : tick;
-        scheduledStartTick = Math.max(titleEnd, tick) + MusicDefinition.secondsToTicks(next.definition().startDelaySeconds());
+        waitingForTitle = titleEnd == Long.MAX_VALUE;
+        scheduledStartTick = MusicPlaybackTiming.afterTitle(tick, titleEnd, MusicDefinition.secondsToTicks(next.definition().startDelaySeconds()));
         nextTrackTick = scheduledStartTick;
     }
 
     private static void refreshTitleWait(long tick) {
-        if (winner == null || !winner.definition().startAfterTitle() || primary != null || scheduledStartTick != Long.MAX_VALUE) return;
+        if (winner == null || !waitingForTitle) return;
         long titleEnd = com.cappleapple.presencenotposition.client.ClientPresentationManager.musicNotBefore(winner.context());
         if (titleEnd != Long.MAX_VALUE) {
-            scheduledStartTick = Math.max(titleEnd, tick) + MusicDefinition.secondsToTicks(winner.definition().startDelaySeconds());
+            waitingForTitle = false;
+            scheduledStartTick = MusicPlaybackTiming.afterTitle(tick, titleEnd, MusicDefinition.secondsToTicks(winner.definition().startDelaySeconds()));
             nextTrackTick = scheduledStartTick;
         }
     }
@@ -154,6 +168,11 @@ public final class ClientMusicManager {
             nextTrackTick = Long.MAX_VALUE;
             return;
         }
+        if (primary != null && ClientConfig.musicCooldownSeconds(primary.choice.context().type()) > 0) {
+            fadePrimary(true, tick);
+            return;
+        }
+        if (!allowsPlayback(tick)) return;
         SelectorKey key = new SelectorKey(choice.context(), choice.period());
         Playback resume = SUSPENDED.remove(key);
         fadePrimary(true, tick);
@@ -162,6 +181,7 @@ public final class ClientMusicManager {
             resume.choice = choice;
             resume.fade(tick, MusicDefinition.secondsToTicks(choice.definition().transitionFadeInSeconds()), resume.volume, targetVolume(choice, resume.track, resources), FadeEnd.NONE);
             primary = resume;
+            nextTrackTick = Long.MAX_VALUE;
         } else {
             startNewPlayback(choice, minecraft, tick, resources, true);
         }
@@ -171,7 +191,7 @@ public final class ClientMusicManager {
     private static void startNewPlayback(
         MusicChoice choice, Minecraft minecraft, long tick, ClientResourceIndex.Snapshot resources, boolean transition
     ) {
-        if (choice.tracks().isEmpty()) return;
+        if (choice.tracks().isEmpty() || !allowsPlayback(tick)) return;
         SelectorKey key = new SelectorKey(choice.context(), choice.period());
         TrackSelector selector = SELECTORS.computeIfAbsent(key, ignored -> new TrackSelector(
             choice.tracks(), choice.definition().selection(), choice.definition().avoidImmediateRepeat(), RANDOM));
@@ -186,6 +206,12 @@ public final class ClientMusicManager {
         PresenceNotPosition.LOGGER.info("Starting location music {} for {}", track, choice.context());
         primary = playback;
         nextTrackTick = Long.MAX_VALUE;
+    }
+
+    private static boolean allowsPlayback(long tick) {
+        boolean waitingForFadeOut = FADING.stream()
+            .anyMatch(playback -> ClientConfig.musicCooldownSeconds(playback.choice.context().type()) > 0);
+        return PLAYBACK_TIMING.allowsPlayback(tick, waitingForFadeOut);
     }
 
     private static float targetVolume(MusicChoice choice, ResourceLocation track, ClientResourceIndex.Snapshot resources) {
@@ -214,8 +240,10 @@ public final class ClientMusicManager {
         Iterator<Playback> iterator = FADING.iterator();
         while (iterator.hasNext()) {
             Playback playback = iterator.next();
-            if (!playback.tickFade(tick, minecraft)) continue;
+            boolean finished = tick - playback.startedTick > 10 && !minecraft.getSoundManager().isActive(playback.sound);
+            if (!playback.tickFade(tick, minecraft) && !finished) continue;
             iterator.remove();
+            PLAYBACK_TIMING.afterPlaybackEnd(tick, 0, ClientConfig.musicCooldownSeconds(playback.choice.context().type()));
             if (playback.fadeEnd == FadeEnd.SUSPEND && minecraft.getSoundManager().isActive(playback.sound)) {
                 SUSPENDED.put(new SelectorKey(playback.choice.context(), playback.choice.period()), playback);
             } else if (playback.fadeEnd == FadeEnd.STOP) {
@@ -240,16 +268,27 @@ public final class ClientMusicManager {
     public static void next() {
         Minecraft minecraft = Minecraft.getInstance();
         manualStop = false;
-        if (primary != null) minecraft.getSoundManager().stop(primary.sound);
+        long tick = com.cappleapple.presencenotposition.client.ClientPresentationManager.clientTick();
+        if (primary != null) {
+            PLAYBACK_TIMING.afterPlaybackEnd(tick, 0, ClientConfig.musicCooldownSeconds(primary.choice.context().type()));
+            minecraft.getSoundManager().stop(primary.sound);
+        }
         primary = null;
-        nextTrackTick = com.cappleapple.presencenotposition.client.ClientPresentationManager.clientTick();
+        nextTrackTick = tick;
     }
 
     public static void stopManual() {
         manualStop = true;
         Minecraft minecraft = Minecraft.getInstance();
-        if (primary != null) minecraft.getSoundManager().stop(primary.sound);
-        for (Playback playback : FADING) minecraft.getSoundManager().stop(playback.sound);
+        long tick = com.cappleapple.presencenotposition.client.ClientPresentationManager.clientTick();
+        if (primary != null) {
+            PLAYBACK_TIMING.afterPlaybackEnd(tick, 0, ClientConfig.musicCooldownSeconds(primary.choice.context().type()));
+            minecraft.getSoundManager().stop(primary.sound);
+        }
+        for (Playback playback : FADING) {
+            PLAYBACK_TIMING.afterPlaybackEnd(tick, 0, ClientConfig.musicCooldownSeconds(playback.choice.context().type()));
+            minecraft.getSoundManager().stop(playback.sound);
+        }
         for (Playback playback : SUSPENDED.values()) minecraft.getSoundManager().stop(playback.sound);
         primary = null;
         FADING.clear();
@@ -271,8 +310,12 @@ public final class ClientMusicManager {
         SELECTORS.clear();
         SUSPENDED.clear();
         FADING.clear();
+        PLAYBACK_TIMING.clear();
         primary = null;
         winner = null;
+        scheduledStartTick = Long.MAX_VALUE;
+        nextTrackTick = Long.MAX_VALUE;
+        waitingForTitle = false;
         resolvedCandidate = null;
         period = null;
         manualStop = false;

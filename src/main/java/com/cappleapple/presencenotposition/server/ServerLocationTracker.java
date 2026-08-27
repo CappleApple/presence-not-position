@@ -6,6 +6,7 @@ import com.cappleapple.presencenotposition.api.LocationEvents;
 import com.cappleapple.presencenotposition.config.ServerConfig;
 import com.cappleapple.presencenotposition.detection.LocationSample;
 import com.cappleapple.presencenotposition.detection.PlayerLocationState;
+import com.cappleapple.presencenotposition.integration.InstancedNotInfiniteCompatibility;
 import com.cappleapple.presencenotposition.location.LocationTransition;
 import com.cappleapple.presencenotposition.network.ContextPayload;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -84,7 +85,8 @@ public final class ServerLocationTracker {
         } catch (RuntimeException exception) {
             PresenceNotPosition.LOGGER.error("Location integration failed for {}", transition.context(), exception);
         }
-        if (transition.entered() && !event.presentationCancelled()) {
+        if (transition.entered() && !event.presentationCancelled()
+            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(transition.context())) {
             PresentationService.show(player, transition.context(), event.override());
         }
         ServerCommands.debugTransition(player, transition);

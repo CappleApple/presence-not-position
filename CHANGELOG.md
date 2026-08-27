@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.3 - 2026-08-27
+
+### Added
+
+- Per-category client music cooldowns, defaulting to zero, with additional forced gaps after tracks and transition fade-outs.
+
+### Changed
+
+- Simultaneous entry stings now play only the topmost sound in dimension, biome, structure, then custom title order.
+
+### Fixed
+
+- Automatic dimension titles and entry sounds no longer trigger for Instanced Not Infinite's temporary dimensions; biome and structure titles, location events, and music are preserved.
+- Pending title waits no longer overflow music-start deadlines or get bypassed by the next-track path.
+
 ## 1.0.2 - 2026-08-26
 
 ### Added

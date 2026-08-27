@@ -17,6 +17,7 @@ public final class ClientConfig {
 
     public static final ModConfigSpec SPEC;
     private static final Map<LocationType, TitleCategory> TITLES = new EnumMap<>(LocationType.class);
+    private static final Map<LocationType, ModConfigSpec.IntValue> MUSIC_COOLDOWNS = new EnumMap<>(LocationType.class);
     public static final ModConfigSpec.IntValue TITLE_X;
     public static final ModConfigSpec.IntValue TITLE_Y;
     public static final ModConfigSpec.IntValue TITLE_SPACING;
@@ -72,11 +73,20 @@ public final class ClientConfig {
             builder.defineEnum("showMode", mode),
             builder.defineInRange("cooldownSeconds", cooldown, 0, Integer.MAX_VALUE)
         ));
+        MUSIC_COOLDOWNS.put(type, builder.comment(
+            "Additional seconds of silence after this category's music ends, on top of resource-pack track delay.",
+            "Applies across location changes and skips. Nonzero values also wait after transition fade-out."
+        ).defineInRange("musicCooldownSeconds", 0, 0, Integer.MAX_VALUE));
         builder.pop();
     }
 
     public static TitleCategory titles(LocationType type) {
         return TITLES.get(type);
+    }
+
+    public static int musicCooldownSeconds(LocationType type) {
+        ModConfigSpec.IntValue value = MUSIC_COOLDOWNS.get(type);
+        return value == null ? 0 : value.get();
     }
 
     public static boolean musicEnabled(LocationType type) {

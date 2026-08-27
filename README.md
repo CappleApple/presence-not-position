@@ -13,6 +13,8 @@ With no presentation resources installed, every registry-backed location still g
 
 Install the mod on the server and participating clients. Client title and music settings never gate server detection or KubeJS events.
 
+When **Instanced Not Infinite** is installed, automatic dimension titles and their entry sounds are skipped for its temporary `instancednotinfinite:instances/<id>` dimensions. Biome and structure titles, location events, and dimension music remain unchanged. Explicit `/pnp title` requests and scripted custom presentations still work. Instanced Not Infinite is optional; without it, all dimensions retain their normal presentation behavior.
+
 ## Resource-pack layout
 
 Definitions live below `assets/<pack_namespace>/presence_not_position/`:
@@ -126,7 +128,7 @@ Individual files use:
 }
 ```
 
-Entry stings are ordinary Minecraft sound events declared by a pack’s `sounds.json`; they are played separately from music.
+Entry stings are ordinary Minecraft sound events declared by a pack’s `sounds.json`; they are played separately from music. A simultaneous title batch plays only the topmost entry that defines a sound: dimension before biome before structure (then custom entries). Rows without a sound are skipped, script sound overrides are respected, and every title still appears. Within one category, the first sound in the title stack's priority/ID order wins.
 
 ## Adaptive music
 
@@ -154,7 +156,7 @@ assets/within/sounds/music/biomes/forest/
 
 Selection values are `sequential`, `random`, and `shuffle` (default). Shuffle exhausts a randomized bag before refilling it and avoids a cycle-boundary repeat when more than one track exists. `trackDelay` accepts either a number or `{ "min": n, "max": n }`; zero provides continuous playback.
 
-Normal starts use `fadeIn`/`fadeOut`; winner changes use `transitionFadeIn`/`transitionFadeOut`. Both streams overlap during a crossfade. `transitionDelay` requires a winner to remain valid before committing; defaults are 0.5 seconds for structures, 2 seconds for biomes, and immediate for dimensions. With `resume: true`, a still-active lower context is kept silent at its current streaming position and resumed when possible.
+Normal starts use `fadeIn`/`fadeOut`; winner changes use `transitionFadeIn`/`transitionFadeOut`. Both streams overlap during a crossfade unless the outgoing category has a nonzero client music cooldown. `transitionDelay` requires a winner to remain valid before committing; defaults are 0.5 seconds for structures, 2 seconds for biomes, and immediate for dimensions. With `resume: true`, a still-active lower context is kept silent at its current streaming position and resumed when possible.
 
 ### Volume normalization
 
@@ -185,16 +187,19 @@ NeoForge creates `config/presence-not-position-client.toml`:
 enabled = true
 showMode = "COOLDOWN"
 cooldownSeconds = 300
+musicCooldownSeconds = 0
 
 [biomes]
 enabled = true
 showMode = "COOLDOWN"
 cooldownSeconds = 600
+musicCooldownSeconds = 0
 
 [dimensions]
 enabled = true
 showMode = "ONCE"
 cooldownSeconds = 0
+musicCooldownSeconds = 0
 
 [titleLayout]
 x = 0
@@ -217,6 +222,8 @@ vanillaMusicDuckVolume = 0.15
 Title layout coordinates are signed offsets from the GUI's top center in scaled pixels. `x = 0` horizontally centers every title, while `y = 0` places the top of the first title row at the top edge; positive values move right/down and negative values move left/up. `spacing` controls the empty pixels between rows when titles stack; extremely dense stacks reduce it only as needed to retain their compact height.
 
 `ALWAYS` shows every legitimate re-entry, `COOLDOWN` is tracked per registry ID, and `ONCE` shows each ID once. History is cosmetic client state in `config/presence-not-position-history.json` and persists across restarts. Title and music category toggles are independent.
+
+Each category's `musicCooldownSeconds` adds a forced gap after its music finishes, separate from the title `cooldownSeconds`. Natural track completion waits for the resource pack's `trackDelay` **plus** this extra gap. On a transition, a nonzero outgoing cooldown makes the music fade out fully and then wait before any location music starts or resumes. Location/day-night changes, resource reloads, and `/pnp music next` cannot bypass an active forced gap. All three defaults are `0`, keeping normal crossfades and resource-pack timing; there is no extra wait before the first track. Disconnecting clears the session's cooldown. This does not change background-music priority (structure > biome > dimension) or entry-sting timing.
 
 Server detection defaults are a five-tick staggered sampling interval, a 15-tick per-structure exit grace, and 20 ticks of biome stability. They are configurable in the generated server config.
 
@@ -299,4 +306,4 @@ $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21'
 .\gradlew.bat runServer
 ```
 
-The test suite covers independent overlapping structures, piece-gap grace, biome stability, dimension rebuilds, all presentation policies, animation semantics, music specificity/fallback/silence, day/night sets, track selectors, delay parsing, registry-path resolution, and cached normalization metadata.
+The test suite covers independent overlapping structures, piece-gap grace, biome stability, dimension rebuilds, optional Instanced Not Infinite title suppression, all presentation policies, animation semantics, music specificity/fallback/silence, day/night sets, track selectors, delay parsing, registry-path resolution, and cached normalization metadata. GameTests use the `presencenotposition` namespace so optional mods do not add their own tests to the run; the empty test template is a development fixture and is excluded from the release JAR.

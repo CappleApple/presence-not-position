@@ -17,6 +17,10 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+sourceSets {
+    testFixtures
+}
+
 repositories {
     maven {
         name = 'LatvianMods'
@@ -74,13 +78,14 @@ neoForge {
         gameTestServer {
             type = 'gameTestServer'
             gameDirectory = project.layout.projectDirectory.dir('run-gametest')
-            systemProperty 'neoforge.enabledGameTestNamespaces', "${project.mod_id},minecraft"
         }
     }
 
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
+            // Keep the namespaced GameTest template in development runs, outside the release JAR.
+            sourceSet(sourceSets.testFixtures)
         }
     }
 

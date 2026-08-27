@@ -3,6 +3,7 @@ package com.cappleapple.presencenotposition.gametest;
 import com.cappleapple.presencenotposition.PresenceNotPosition;
 import com.cappleapple.presencenotposition.detection.LocationSample;
 import com.cappleapple.presencenotposition.detection.PlayerLocationState;
+import com.cappleapple.presencenotposition.integration.InstancedNotInfiniteCompatibility;
 import com.cappleapple.presencenotposition.location.LocationContext;
 import com.cappleapple.presencenotposition.location.LocationType;
 import com.cappleapple.presencenotposition.music.DayPeriod;
@@ -18,17 +19,18 @@ import java.util.Set;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 @GameTestHolder(PresenceNotPosition.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class PresenceGameTests {
-    private static final String EMPTY = "bastion/mobs/empty";
+    private static final String EMPTY = "empty";
 
     private PresenceGameTests() { }
 
-    @GameTest(templateNamespace = "minecraft", template = EMPTY)
+    @GameTest(template = EMPTY)
     public static void overlappingStructuresRemainIndependent(GameTestHelper helper) {
         PlayerLocationState state = new PlayerLocationState(10, 20);
         ResourceLocation dimension = id("overworld");
@@ -41,7 +43,7 @@ public final class PresenceGameTests {
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = "minecraft", template = EMPTY)
+    @GameTest(template = EMPTY)
     public static void biomeBorderRequiresStableObservation(GameTestHelper helper) {
         PlayerLocationState state = new PlayerLocationState(15, 20);
         state.sample(new LocationSample(id("overworld"), id("plains"), Set.of()), 0);
@@ -50,7 +52,7 @@ public final class PresenceGameTests {
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = "minecraft", template = EMPTY)
+    @GameTest(template = EMPTY)
     public static void dimensionChangeRebuildsContext(GameTestHelper helper) {
         PlayerLocationState state = new PlayerLocationState(15, 20);
         state.sample(new LocationSample(id("overworld"), id("plains"), Set.of(id("village"))), 0);
@@ -60,7 +62,7 @@ public final class PresenceGameTests {
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = "minecraft", template = EMPTY)
+    @GameTest(template = EMPTY)
     public static void musicSpecificityAndFallbackAreServerLoadable(GameTestHelper helper) {
         LocationContext dimension = new LocationContext(LocationType.DIMENSION, id("the_nether"));
         LocationContext biome = new LocationContext(LocationType.BIOME, id("soul_sand_valley"));
@@ -68,6 +70,46 @@ public final class PresenceGameTests {
         var definitions = Map.of(dimension, resolved("dimension"), biome, resolved("biome"), structure, resolved("structure"));
         var winner = MusicContextResolver.resolve(Set.of(dimension, biome, structure), definitions, ignored -> true, DayPeriod.DAY).orElseThrow();
         helper.assertTrue(winner.context().equals(structure), "Structure music must beat biome and dimension music");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void instanceTitleSuppressionPreservesContextsAndMusic(GameTestHelper helper) {
+        ResourceLocation instance = ResourceLocation.fromNamespaceAndPath("instancednotinfinite", "instances/0123456789abcdef0123456789abcdef");
+        LocationContext dimension = new LocationContext(LocationType.DIMENSION, instance);
+        LocationContext biome = new LocationContext(LocationType.BIOME, id("plains"));
+        LocationContext structure = new LocationContext(LocationType.STRUCTURE, id("ancient_city"));
+        PlayerLocationState state = new PlayerLocationState(15, 20);
+        var changes = state.sample(new LocationSample(instance, biome.id(), Set.of(structure.id())), 0);
+        helper.assertTrue(changes.size() == 3 && changes.stream().allMatch(change -> change.entered()),
+            "Logging in inside an instance must still enter all three location contexts");
+        helper.assertTrue(state.dimension().equals(instance), "The actual instance dimension must remain tracked");
+        boolean modLoaded = ModList.get().isLoaded("instancednotinfinite");
+        helper.assertTrue(InstancedNotInfiniteCompatibility.suppressAutomaticTitle(dimension) == modLoaded,
+            "Instance titles must be suppressed only when Instanced Not Infinite is loaded");
+        helper.assertTrue(!InstancedNotInfiniteCompatibility.suppressAutomaticTitle(biome)
+            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(structure),
+            "Biome and structure titles must remain available inside instances");
+        var music = MusicContextResolver.resolve(Set.of(dimension, biome, structure), Map.of(dimension, resolved("instance")),
+            ignored -> true, DayPeriod.DAY).orElseThrow();
+        helper.assertTrue(music.context().equals(dimension), "Suppressing the title must not remove dimension music fallback");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void leavingInstanceRestoresNormalDimensionPresentation(GameTestHelper helper) {
+        ResourceLocation instance = ResourceLocation.fromNamespaceAndPath("instancednotinfinite", "instances/0123456789abcdef0123456789abcdef");
+        PlayerLocationState state = new PlayerLocationState(15, 20);
+        state.sample(new LocationSample(instance, id("plains"), Set.of(id("ancient_city"))), 0);
+        var changes = state.sample(new LocationSample(id("overworld"), id("plains"), Set.of()), 1);
+        helper.assertTrue(changes.stream().anyMatch(change -> !change.entered()
+            && change.context().type() == LocationType.DIMENSION && change.context().id().equals(instance)),
+            "The instance dimension must still emit an exit transition");
+        var enteredDimension = changes.stream().filter(change -> change.entered()
+            && change.context().type() == LocationType.DIMENSION).findFirst().orElseThrow();
+        helper.assertTrue(enteredDimension.context().id().equals(id("overworld"))
+            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(enteredDimension.context()),
+            "Returning to the overworld must retain its normal automatic dimension title");
         helper.succeed();
     }
 
