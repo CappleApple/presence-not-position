@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.cappleapple.presencenotposition.location.LocationType;
+import com.cappleapple.presencenotposition.location.LocationContext;
 import com.cappleapple.presencenotposition.music.MusicSelection;
 import com.cappleapple.presencenotposition.presentation.VisualDefinition;
 import com.google.gson.JsonParser;
@@ -42,5 +43,23 @@ class DefinitionParserTest {
         assertEquals(
             ResourceLocation.fromNamespaceAndPath("within", "deep/dark_warning"),
             PresentationResourceLoader.target(ResourceLocation.fromNamespaceAndPath("within", "custom/deep/dark_warning/presentation")).id());
+    }
+
+    @Test void homePathUsesTheSameTitleSoundAndDayNightMusicDefinition() {
+        var home = PresentationResourceLoader.target(ResourceLocation.parse("within:home/presentation"));
+        assertEquals(LocationContext.HOME, home);
+        var definition = DefinitionParser.parse(home.type(), JsonParser.parseString("""
+            {
+              "title": {"text":"Welcome Home", "subtitle":"Rest a while", "duration":100},
+              "entrySound": {"id":"minecraft:block.amethyst_block.chime", "volume":0.5},
+              "music": {"folder":"within:music/home", "dayFolder":"within:music/home/day",
+                        "nightFolder":"within:music/home/night", "startAfterTitle":true}
+            }
+            """).getAsJsonObject());
+        assertEquals("Welcome Home", definition.title().text());
+        assertEquals(ResourceLocation.parse("minecraft:block.amethyst_block.chime"), definition.entrySound().id());
+        assertEquals(ResourceLocation.parse("within:music/home/day"), definition.music().dayFolder());
+        assertEquals(ResourceLocation.parse("within:music/home/night"), definition.music().nightFolder());
+        assertTrue(definition.music().startAfterTitle());
     }
 }

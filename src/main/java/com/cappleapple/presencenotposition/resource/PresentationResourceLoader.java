@@ -78,6 +78,7 @@ public final class PresentationResourceLoader extends SimplePreparableReloadList
 
     static LocationContext target(ResourceLocation resourceId) {
         String[] parts = resourceId.getPath().split("/");
+        if (resourceId.getPath().equals("home/presentation")) return LocationContext.HOME;
         if (parts.length < 3 || !"presentation".equals(parts[parts.length - 1])) {
             throw new IllegalArgumentException("Expected <type>/.../presentation.json");
         }

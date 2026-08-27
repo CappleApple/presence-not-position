@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 class ClientConfigTest {
     @Test
     void everyMusicCategoryHasItsOwnZeroDefaultCooldown() {
-        for (String category : List.of("structures", "biomes", "dimensions")) {
+        for (String category : List.of("structures", "biomes", "dimensions", "home")) {
             ModConfigSpec.ValueSpec spec = ClientConfig.SPEC.getSpec().get(List.of(category, "musicCooldownSeconds"));
             assertEquals(0, spec.getDefault());
             assertTrue(spec.test(0));
@@ -26,5 +26,6 @@ class ClientConfigTest {
         assertEquals(300, ClientConfig.titles(LocationType.STRUCTURE).cooldownSeconds().getDefault());
         assertEquals(600, ClientConfig.titles(LocationType.BIOME).cooldownSeconds().getDefault());
         assertEquals(0, ClientConfig.titles(LocationType.DIMENSION).cooldownSeconds().getDefault());
+        assertEquals(300, ClientConfig.titles(LocationType.HOME).cooldownSeconds().getDefault());
     }
 }

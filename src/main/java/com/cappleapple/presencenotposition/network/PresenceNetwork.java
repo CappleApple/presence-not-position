@@ -13,7 +13,7 @@ public final class PresenceNetwork {
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        event.registrar("1")
+        event.registrar("2")
             .playToClient(ContextPayload.TYPE, ContextPayload.STREAM_CODEC,
                 (payload, context) -> context.enqueueWork(() -> ClientPayloadHandler.handle(payload)))
             .playToClient(PresentationPayload.TYPE, PresentationPayload.STREAM_CODEC,

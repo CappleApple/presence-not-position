@@ -6,7 +6,8 @@ public enum LocationType {
     STRUCTURE("structures", 200, 3),
     BIOME("biomes", 50, 2),
     DIMENSION("dimensions", 100, 1),
-    CUSTOM("custom", 300, 0);
+    CUSTOM("custom", 300, 0),
+    HOME("home", 250, 4);
 
     private final String resourceDirectory;
     private final int defaultTitlePriority;

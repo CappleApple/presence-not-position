@@ -4,6 +4,9 @@ import java.util.Objects;
 import net.minecraft.resources.ResourceLocation;
 
 public record LocationContext(LocationType type, ResourceLocation id) implements Comparable<LocationContext> {
+    public static final LocationContext HOME = new LocationContext(LocationType.HOME,
+        ResourceLocation.fromNamespaceAndPath("presencenotposition", "home"));
+
     public LocationContext {
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(id, "id");

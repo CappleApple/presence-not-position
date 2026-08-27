@@ -3,7 +3,9 @@ package com.cappleapple.presencenotposition.config;
 import com.cappleapple.presencenotposition.location.LocationType;
 import com.cappleapple.presencenotposition.presentation.ShowMode;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class ClientConfig {
@@ -27,6 +29,8 @@ public final class ClientConfig {
     public static final ModConfigSpec.BooleanValue STRUCTURE_MUSIC;
     public static final ModConfigSpec.BooleanValue BIOME_MUSIC;
     public static final ModConfigSpec.BooleanValue DIMENSION_MUSIC;
+    public static final ModConfigSpec.BooleanValue HOME_MUSIC;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> ADDITIONAL_PRIORITY_SOUNDS;
     public static final ModConfigSpec.EnumValue<VanillaMusicBehavior> VANILLA_MUSIC_BEHAVIOR;
     public static final ModConfigSpec.DoubleValue VANILLA_MUSIC_DUCK_VOLUME;
 
@@ -35,6 +39,7 @@ public final class ClientConfig {
         addTitleCategory(builder, LocationType.STRUCTURE, true, ShowMode.COOLDOWN, 300);
         addTitleCategory(builder, LocationType.BIOME, true, ShowMode.COOLDOWN, 600);
         addTitleCategory(builder, LocationType.DIMENSION, true, ShowMode.ONCE, 0);
+        addTitleCategory(builder, LocationType.HOME, true, ShowMode.COOLDOWN, 300);
         builder.push("titleLayout");
         TITLE_X = builder.comment(
             "Signed horizontal offset from the top-center origin in scaled GUI pixels. 0 is centered."
@@ -57,6 +62,12 @@ public final class ClientConfig {
         STRUCTURE_MUSIC = builder.define("structureMusic", true);
         BIOME_MUSIC = builder.define("biomeMusic", true);
         DIMENSION_MUSIC = builder.define("dimensionMusic", true);
+        HOME_MUSIC = builder.define("homeMusic", true);
+        ADDITIONAL_PRIORITY_SOUNDS = builder.comment(
+            "Extra sound-event IDs that mute location music, for boss mods using non-music sound categories.",
+            "Audible RECORDS and non-vanilla MUSIC sounds are detected automatically."
+        ).defineListAllowEmpty("additionalPrioritySounds", List.of(),
+            () -> "example:boss_theme", value -> value instanceof String id && ResourceLocation.tryParse(id) != null);
         VANILLA_MUSIC_BEHAVIOR = builder.defineEnum("vanillaMusicBehavior", VanillaMusicBehavior.REPLACE);
         VANILLA_MUSIC_DUCK_VOLUME = builder.defineInRange("vanillaMusicDuckVolume", 0.15, 0.0, 1.0);
         builder.pop();
@@ -94,6 +105,7 @@ public final class ClientConfig {
             case STRUCTURE -> STRUCTURE_MUSIC.get();
             case BIOME -> BIOME_MUSIC.get();
             case DIMENSION -> DIMENSION_MUSIC.get();
+            case HOME -> HOME_MUSIC.get();
             case CUSTOM -> false;
         };
     }

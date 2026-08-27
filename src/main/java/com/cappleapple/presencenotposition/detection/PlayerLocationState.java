@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 
 /** Pure transition state machine; world sampling and side effects deliberately live elsewhere. */
@@ -21,6 +23,7 @@ public final class PlayerLocationState {
     private ResourceLocation biome;
     private ResourceLocation biomeCandidate;
     private long biomeCandidateSince;
+    private BlockPos home;
 
     public PlayerLocationState(int structureExitGraceTicks, int biomeStabilityTicks) {
         if (structureExitGraceTicks < 0 || biomeStabilityTicks < 0) {
@@ -44,15 +47,18 @@ public final class PlayerLocationState {
                 this.structureLastSeen.put(structure, gameTick);
                 transitions.add(LocationTransition.enter(context(LocationType.STRUCTURE, structure)));
             }
+            updateHome(sample.home(), transitions);
             return List.copyOf(transitions);
         }
 
         updateBiome(sample.biome(), gameTick, transitions);
         updateStructures(sample.structures(), gameTick, transitions);
+        updateHome(sample.home(), transitions);
         return List.copyOf(transitions);
     }
 
     private void exitOldDimension(List<LocationTransition> transitions) {
+        updateHome(null, transitions);
         for (ResourceLocation structure : sorted(this.structureLastSeen.keySet())) {
             transitions.add(LocationTransition.exit(context(LocationType.STRUCTURE, structure)));
         }
@@ -98,6 +104,18 @@ public final class PlayerLocationState {
             this.structureLastSeen.remove(id);
             transitions.add(LocationTransition.exit(context(LocationType.STRUCTURE, id)));
         }
+    }
+
+    private void updateHome(@Nullable BlockPos observed, List<LocationTransition> transitions) {
+        if (Objects.equals(this.home, observed)) return;
+        if (this.home != null) transitions.add(LocationTransition.exit(LocationContext.HOME));
+        this.home = observed;
+        if (observed != null) transitions.add(LocationTransition.enter(LocationContext.HOME));
+    }
+
+    @Nullable
+    public BlockPos home() {
+        return this.home;
     }
 
     public ResourceLocation dimension() {

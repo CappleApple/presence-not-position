@@ -54,6 +54,25 @@ class MusicContextResolverTest {
         assertEquals(fallback.tracks().generic(), fallback.tracks().resolve(DayPeriod.NIGHT));
     }
 
+    @Test void homeOverridesStructureAndRevealsItAgainOnExitOrWhenDisabled() {
+        var definitions = Map.of(LocationContext.HOME, music(track("home")), STRUCTURE, music(track("structure")));
+        var active = Set.of(LocationContext.HOME, STRUCTURE);
+        assertEquals(LocationContext.HOME, resolve(active, definitions, ignored -> true).context());
+        assertEquals(STRUCTURE, resolve(Set.of(STRUCTURE), definitions, ignored -> true).context());
+        assertEquals(STRUCTURE, resolve(active, definitions, context -> context.type() != LocationType.HOME).context());
+    }
+
+    @Test void missingHomeSongsFallThroughButHomeCanRequestSilence() {
+        var emptyHome = new ResolvedMusic(definition(false), new MusicTrackSet(List.of(), List.of(), List.of()));
+        var active = Set.of(LocationContext.HOME, STRUCTURE);
+        assertEquals(STRUCTURE, resolve(active, Map.of(LocationContext.HOME, emptyHome,
+            STRUCTURE, music(track("structure"))), ignored -> true).context());
+        var silence = new ResolvedMusic(definition(true), emptyHome.tracks());
+        var result = resolve(active, Map.of(LocationContext.HOME, silence, STRUCTURE, music(track("structure"))), ignored -> true);
+        assertEquals(LocationContext.HOME, result.context());
+        assertTrue(result.silence());
+    }
+
     private static MusicChoice resolve(Set<LocationContext> active, Map<LocationContext, ResolvedMusic> defs, java.util.function.Predicate<LocationContext> enabled) {
         return MusicContextResolver.resolve(active, defs, enabled, DayPeriod.DAY).orElseThrow();
     }

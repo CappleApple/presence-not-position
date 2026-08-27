@@ -13,6 +13,7 @@ import net.minecraft.util.valueproviders.ConstantFloat;
 /** A directly streamed OGG resource; no sounds.json entry is required. */
 public final class DynamicMusicSound extends AbstractTickableSoundInstance {
     private final Sound directSound;
+    private boolean muted;
 
     public DynamicMusicSound(ResourceLocation track) {
         super(SoundEvent.createVariableRangeEvent(track), SoundSource.MUSIC, RandomSource.create());
@@ -42,5 +43,16 @@ public final class DynamicMusicSound extends AbstractTickableSoundInstance {
 
     public void setDynamicVolume(float volume) {
         this.volume = Math.max(0.0F, volume);
+    }
+
+    public boolean setMuted(boolean muted) {
+        boolean changed = this.muted != muted;
+        this.muted = muted;
+        return changed;
+    }
+
+    @Override
+    public float getVolume() {
+        return this.muted ? 0.0F : super.getVolume();
     }
 }

@@ -1,6 +1,6 @@
 # Presence Not Position
 
-Presence Not Position is a NeoForge 1.21.1 location-identity framework. The server authoritatively detects structure, biome, and dimension transitions and fires scripting events; each client independently resolves resource-pack presentations, title policy, and adaptive music.
+Presence Not Position is a NeoForge 1.21.1 location-identity framework. The server authoritatively detects structure, biome, dimension, and respawn-bed home transitions and fires scripting events; each client independently resolves resource-pack presentations, title policy, and adaptive music.
 
 With no presentation resources installed, every registry-backed location still gets a readable text title. `minecraft:ancient_city` becomes “Ancient City”, and localized registry names take precedence when they exist.
 
@@ -24,10 +24,13 @@ assets/within/presence_not_position/
 ├── structures/cataclysm/burning_arena/presentation.json
 ├── biomes/minecraft/deep_dark/presentation.json
 ├── dimensions/minecraft/the_nether/presentation.json
+├── home/presentation.json
 └── custom/deep_dark_warning/presentation.json
 ```
 
 The target registry namespace remains a path segment for structures, biomes, and dimensions. Thus the first file targets `cataclysm:burning_arena`; the custom file targets `within:deep_dark_warning` because custom IDs use the asset namespace.
+
+`home/presentation.json` targets the shared `HOME presencenotposition:home` context; each player enters it only around their own current respawn bed.
 
 Normal resource-pack precedence applies when a pack replaces the same asset namespace and path. To override an existing definition, mirror its complete path.
 
@@ -85,7 +88,7 @@ All sections are optional. A complete definition can look like this:
 
 Title durations and fades are ticks. Music delays and fades are seconds. Malformed files are logged and ignored; a missing visual falls back to text, and missing higher-priority music falls through to the next usable context.
 
-Location entries detected together are presented as one simultaneous vertical stack, not as a sequential title queue. The fixed top-to-bottom order is dimension, biome, then structure. The highest available category occupies the top row at the largest size, so a biome is largest when no dimension entered in that batch and a structure is largest when it is the only entry. Multiple structures in the same batch remain grouped below the biome in deterministic priority and ID order.
+Location entries detected together are presented as one simultaneous vertical stack, not as a sequential title queue. The fixed top-to-bottom order is dimension, biome, structure, then home. The highest available category occupies the top row at the largest size, so a biome is largest when no dimension entered in that batch and a structure or home is largest when it is the only entry. Multiple structures in the same batch remain grouped below the biome in deterministic priority and ID order.
 
 The complete stack is compacted into the top third of the GUI. Category words such as “Dimension” and “Biome” are not added automatically; a resource pack can still provide an intentional subtitle when desired.
 
@@ -128,14 +131,56 @@ Individual files use:
 }
 ```
 
-Entry stings are ordinary Minecraft sound events declared by a pack’s `sounds.json`; they are played separately from music. A simultaneous title batch plays only the topmost entry that defines a sound: dimension before biome before structure (then custom entries). Rows without a sound are skipped, script sound overrides are respected, and every title still appears. Within one category, the first sound in the title stack's priority/ID order wins.
+Entry stings are ordinary Minecraft sound events declared by a pack’s `sounds.json`; they are played separately from music. A simultaneous title batch plays only the topmost entry that defines a sound: dimension before biome before structure before home (then custom entries). Rows without a sound are skipped, script sound overrides are respected, and every title still appears. Within one category, the first sound in the title stack's priority/ID order wins.
+
+## Respawn-bed home
+
+The server's `[home]` section in `presence-not-position-server.toml` controls detection:
+
+```toml
+[home]
+enabled = true
+radius = 64.0
+```
+
+The radius is a sphere measured from the center of the player's current respawn-bed block to the player's position, including vertical distance. The boundary is included. The bed must still exist in the same dimension; other nearby beds, world spawn, forced spawn coordinates without a bed, and respawn anchors do not count. Modded beds that implement NeoForge's bed detection are supported. Sampling does not load bed chunks. Changing or breaking the respawn bed, leaving the radius, or changing dimension updates the home context on the next detection poll.
+
+Home defaults to a readable “Home” title. To supply its entrance title, sound, and background songs, add `assets/within/presence_not_position/home/presentation.json` to your resource pack:
+
+```json
+{
+  "title": {
+    "text": "Welcome Home",
+    "subtitle": "Rest a while",
+    "duration": 100
+  },
+  "entrySound": {
+    "id": "minecraft:block.amethyst_block.chime",
+    "volume": 0.7,
+    "pitch": 1.0
+  },
+  "music": {
+    "folder": "within:music/home",
+    "dayFolder": "within:music/home/day",
+    "nightFolder": "within:music/home/night",
+    "startAfterTitle": true,
+    "selection": "shuffle",
+    "fadeIn": 3.0,
+    "fadeOut": 3.0
+  }
+}
+```
+
+Place songs under `assets/within/sounds/music/home/` (and its `day/` and `night/` subfolders). Home supports the same text, localization, title art, entry-sound, timing, normalization, and playlist fields as other locations. No songs are bundled. Its optional default-name translation key is `home.presencenotposition.home`. Its client `[home]` policy controls entrance titles independently from `[music].homeMusic`; title history uses the single `presencenotposition:home` ID even after changing beds.
+
+When home has usable music it takes precedence over structures, biomes, and dimensions. With no home playlist, normal location music continues; `silenceLowerPriority` can explicitly request silence instead.
 
 ## Adaptive music
 
 All active contexts are retained. The winner is the first usable definition in this order:
 
 ```text
-STRUCTURE > BIOME > DIMENSION
+HOME > STRUCTURE > BIOME > DIMENSION
 ```
 
 A higher context with no valid tracks does not interrupt lower music. A definition with `silenceLowerPriority: true` is deliberately usable without a folder and fades lower music to silence.
@@ -156,7 +201,7 @@ assets/within/sounds/music/biomes/forest/
 
 Selection values are `sequential`, `random`, and `shuffle` (default). Shuffle exhausts a randomized bag before refilling it and avoids a cycle-boundary repeat when more than one track exists. `trackDelay` accepts either a number or `{ "min": n, "max": n }`; zero provides continuous playback.
 
-Normal starts use `fadeIn`/`fadeOut`; winner changes use `transitionFadeIn`/`transitionFadeOut`. Both streams overlap during a crossfade unless the outgoing category has a nonzero client music cooldown. `transitionDelay` requires a winner to remain valid before committing; defaults are 0.5 seconds for structures, 2 seconds for biomes, and immediate for dimensions. With `resume: true`, a still-active lower context is kept silent at its current streaming position and resumed when possible.
+Normal starts use `fadeIn`/`fadeOut`; winner changes use `transitionFadeIn`/`transitionFadeOut`. Both streams overlap during a crossfade unless the outgoing category has a nonzero client music cooldown. `transitionDelay` requires a winner to remain valid before committing; defaults are 0.5 seconds for structures and home, 2 seconds for biomes, and immediate for dimensions. With `resume: true`, a still-active lower context is kept silent at its current streaming position and resumed when possible.
 
 ### Volume normalization
 
@@ -177,6 +222,14 @@ When measured loudness is available, gain targets `normalizationTarget` (default
 - `ALLOW`: leave vanilla music untouched
 
 The implementation adjusts live sound channels and never rewrites the user’s Minecraft volume options. PNP streams remain in the normal MUSIC category, so Minecraft’s master and music sliders still apply.
+
+### Jukebox and boss music
+
+PNP music is muted while an audible RECORDS sound (including jukebox discs) or non-vanilla MUSIC sound is playing. This includes boss themes played through Minecraft's music manager or directly through its sound engine; the vanilla dragon theme also takes priority. Other mods' MUSIC sounds are conservatively treated as priority music even when they are not boss themes. Vanilla background replacement/ducking only changes vanilla background music, and other mods' music-selection hooks keep running.
+
+Detection checks live sound channels, their volume sliders, and positional attenuation. A stopped, silent, or out-of-range jukebox does not keep PNP muted. All PNP streams, including outgoing crossfades, are muted together. Existing tracks continue advancing silently; new tracks and music transitions wait. When the external music ends, PNP becomes audible again and continues normal playlist timing. Entrance stings and titles are unaffected.
+
+For a boss mod that plays its theme in another category, add the exact sound-event ID to `[music].additionalPrioritySounds`, for example `additionalPrioritySounds = ["example:boss_theme"]`. Ordinary hostile sound effects do not mute PNP. Music played outside Minecraft's sound engine cannot be detected by this mechanism.
 
 ## Client configuration
 
@@ -201,6 +254,12 @@ showMode = "ONCE"
 cooldownSeconds = 0
 musicCooldownSeconds = 0
 
+[home]
+enabled = true
+showMode = "COOLDOWN"
+cooldownSeconds = 300
+musicCooldownSeconds = 0
+
 [titleLayout]
 x = 0
 y = 0
@@ -215,6 +274,8 @@ masterVolume = 1.0
 structureMusic = true
 biomeMusic = true
 dimensionMusic = true
+homeMusic = true
+additionalPrioritySounds = []
 vanillaMusicBehavior = "REPLACE"
 vanillaMusicDuckVolume = 0.15
 ```
@@ -223,7 +284,7 @@ Title layout coordinates are signed offsets from the GUI's top center in scaled 
 
 `ALWAYS` shows every legitimate re-entry, `COOLDOWN` is tracked per registry ID, and `ONCE` shows each ID once. History is cosmetic client state in `config/presence-not-position-history.json` and persists across restarts. Title and music category toggles are independent.
 
-Each category's `musicCooldownSeconds` adds a forced gap after its music finishes, separate from the title `cooldownSeconds`. Natural track completion waits for the resource pack's `trackDelay` **plus** this extra gap. On a transition, a nonzero outgoing cooldown makes the music fade out fully and then wait before any location music starts or resumes. Location/day-night changes, resource reloads, and `/pnp music next` cannot bypass an active forced gap. All three defaults are `0`, keeping normal crossfades and resource-pack timing; there is no extra wait before the first track. Disconnecting clears the session's cooldown. This does not change background-music priority (structure > biome > dimension) or entry-sting timing.
+Each category's `musicCooldownSeconds` adds a forced gap after its music finishes, separate from the title `cooldownSeconds`. Natural track completion waits for the resource pack's `trackDelay` **plus** this extra gap. On a transition, a nonzero outgoing cooldown makes the music fade out fully and then wait before any location music starts or resumes. Location/day-night changes, resource reloads, and `/pnp music next` cannot bypass an active forced gap. All four defaults are `0`, keeping normal crossfades and resource-pack timing; there is no extra wait before the first track. Disconnecting clears the session's cooldown. This does not change background-music priority (home > structure > biome > dimension) or entry-sting timing.
 
 Server detection defaults are a five-tick staggered sampling interval, a 15-tick per-structure exit grace, and 20 ticks of biome stability. They are configurable in the generated server config.
 
@@ -246,6 +307,8 @@ PresenceNotPosition.biomeEntered(event => {})
 PresenceNotPosition.biomeExited(event => {})
 PresenceNotPosition.dimensionEntered(event => {})
 PresenceNotPosition.dimensionExited(event => {})
+PresenceNotPosition.homeEntered(event => {})
+PresenceNotPosition.homeExited(event => {})
 PresenceNotPosition.entered(event => {})
 PresenceNotPosition.exited(event => {})
 ```
@@ -272,7 +335,7 @@ PresenceNotPosition.show(player, {
 })
 ```
 
-For custom requests only, `respectClientPolicy: false` bypasses the client’s custom-presentation toggle. Built-in structure, biome, and dimension titles always respect their category policy.
+For custom requests only, `respectClientPolicy: false` bypasses the client’s custom-presentation toggle. Built-in structure, biome, dimension, and home titles always respect their category policy.
 
 ## Debug commands
 
@@ -281,10 +344,10 @@ Server-aware commands:
 ```text
 /pnp current
 /pnp debug
-/pnp title <structure|biome|dimension|custom> <namespace:id>
+/pnp title <structure|biome|dimension|home|custom> <namespace:id>
 ```
 
-`debug` and `title` require permission level 2. Client music/history commands are:
+`/pnp current` includes the active home-bed coordinates. `/pnp title home presencenotposition:home` previews the home presentation (subject to client policy). `debug` and `title` require permission level 2. Client music/history commands are:
 
 ```text
 /pnp music current
@@ -306,4 +369,6 @@ $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21'
 .\gradlew.bat runServer
 ```
 
-The test suite covers independent overlapping structures, piece-gap grace, biome stability, dimension rebuilds, optional Instanced Not Infinite title suppression, all presentation policies, animation semantics, music specificity/fallback/silence, day/night sets, track selectors, delay parsing, registry-path resolution, and cached normalization metadata. GameTests use the `presencenotposition` namespace so optional mods do not add their own tests to the run; the empty test template is a development fixture and is excluded from the release JAR.
+The test suite covers independent overlapping structures, piece-gap grace, biome stability, dimension rebuilds, home entry/exit and bed changes, optional Instanced Not Infinite title suppression, all presentation policies, animation semantics, music specificity/fallback/silence, interruption audibility and reversible muting, day/night sets, track selectors, delay parsing, resource-path resolution, and cached normalization metadata. GameTests also verify real respawn-bed sampling, radius boundaries, bed removal, dimension checks, and avoiding chunk loads. GameTests use the `presencenotposition` namespace so optional mods do not add their own tests to the run; the empty test template is a development fixture and is excluded from the release JAR.
+
+The home context uses network protocol version 2; update the mod on both server and clients together.

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0 - 2026-08-27
+
+### Added
+
+- Configurable home detection around the player's current respawn bed, with its own entrance titles, entry sounds, day/night playlists, client policies, and KubeJS enter/exit events.
+- Automatic muting of location music while audible jukebox or other mods' music plays, with additional sound-event IDs for boss music using other audio categories.
+
+### Changed
+
+- Home music takes priority over structure, biome, and dimension music when a home playlist is available.
+
+### Fixed
+
+- Vanilla music replacement no longer blocks other mods' music selection or lowers their music volume.
+
 ## 1.0.3 - 2026-08-27
 
 ### Added

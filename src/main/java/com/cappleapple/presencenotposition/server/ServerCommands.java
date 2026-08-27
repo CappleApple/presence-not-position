@@ -52,6 +52,8 @@ public final class ServerCommands {
         player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.biome", state.biome()));
         String structures = state.structures().isEmpty() ? "(none)" : String.join(", ", state.structures().stream().map(ResourceLocation::toString).sorted().toList());
         player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.structures", structures));
+        player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.home",
+            state.home() == null ? "(outside home)" : state.home().toShortString()));
         return 1;
     }
 

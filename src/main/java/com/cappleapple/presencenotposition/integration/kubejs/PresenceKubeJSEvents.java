@@ -23,6 +23,8 @@ final class PresenceKubeJSEvents {
         EXIT.put(LocationType.BIOME, GROUP.server("biomeExited", () -> LocationEventJS.class));
         ENTER.put(LocationType.DIMENSION, GROUP.server("dimensionEntered", () -> LocationEventJS.class));
         EXIT.put(LocationType.DIMENSION, GROUP.server("dimensionExited", () -> LocationEventJS.class));
+        ENTER.put(LocationType.HOME, GROUP.server("homeEntered", () -> LocationEventJS.class));
+        EXIT.put(LocationType.HOME, GROUP.server("homeExited", () -> LocationEventJS.class));
     }
 
     private PresenceKubeJSEvents() {

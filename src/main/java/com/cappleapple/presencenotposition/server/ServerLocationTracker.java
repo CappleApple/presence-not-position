@@ -74,7 +74,8 @@ public final class ServerLocationTracker {
                 if (id != null) structures.add(id);
             }
         });
-        return new LocationSample(dimension, biome, structures);
+        return new LocationSample(dimension, biome, structures,
+            ServerConfig.HOME_ENABLED.get() ? HomeDetector.findHome(player, ServerConfig.HOME_RADIUS.get()) : null);
     }
 
     private static void dispatch(ServerPlayer player, LocationTransition transition) {

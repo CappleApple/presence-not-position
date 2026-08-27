@@ -13,12 +13,24 @@ import com.cappleapple.presencenotposition.music.MusicSelection;
 import com.cappleapple.presencenotposition.music.MusicTrackSet;
 import com.cappleapple.presencenotposition.music.ResolvedMusic;
 import com.cappleapple.presencenotposition.music.TrackDelay;
+import com.cappleapple.presencenotposition.server.HomeDetector;
+import com.mojang.authlib.GameProfile;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ClientInformation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -111,6 +123,80 @@ public final class PresenceGameTests {
             && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(enteredDimension.context()),
             "Returning to the overworld must retain its normal automatic dimension title");
         helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void respawnBedHomeUsesConfigurableSphericalRadius(GameTestHelper helper) {
+        BlockPos bed = placeBed(helper, new BlockPos(1, 2, 1));
+        ServerPlayer player = homePlayer(helper, bed);
+        Vec3 center = Vec3.atCenterOf(bed);
+        player.setPos(center.add(8, 0, 0));
+        helper.assertTrue(bed.equals(HomeDetector.findHome(player, 8)), "The configured radius includes its boundary");
+        helper.assertTrue(HomeDetector.findHome(player, 7) == null, "A smaller radius must exclude the same position");
+        player.setPos(center.add(8.01, 0, 0));
+        helper.assertTrue(HomeDetector.findHome(player, 8) == null, "Positions outside the radius must not count as home");
+        player.setPos(center.add(0, 8.01, 0));
+        helper.assertTrue(HomeDetector.findHome(player, 8) == null, "Radius must include vertical distance");
+        player.setPos(center);
+        player.setRespawnPosition(helper.getLevel().dimension(), null, 0, false, false);
+        helper.assertTrue(HomeDetector.findHome(player, 64) == null, "An arbitrary nearby bed is not the current respawn bed");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void movingOrBreakingTheCurrentRespawnBedUpdatesHome(GameTestHelper helper) {
+        BlockPos original = placeBed(helper, new BlockPos(1, 2, 1));
+        BlockPos replacement = placeBed(helper, new BlockPos(4, 2, 1));
+        ServerPlayer player = homePlayer(helper, original);
+        helper.assertTrue(original.equals(HomeDetector.findHome(player, 64)), "Current bed must be detected");
+        player.setRespawnPosition(helper.getLevel().dimension(), replacement, 0, false, false);
+        helper.assertTrue(replacement.equals(HomeDetector.findHome(player, 64)), "Respawn changes must select only the new bed");
+        helper.assertTrue(HomeDetector.findHome(player, 2) == null, "The old bed must not keep acting as home");
+        helper.getLevel().setBlockAndUpdate(replacement, Blocks.AIR.defaultBlockState());
+        helper.assertTrue(HomeDetector.findHome(player, 64) == null, "Destroyed respawn beds must stop acting as home");
+        helper.getLevel().setBlockAndUpdate(replacement, Blocks.STONE.defaultBlockState());
+        player.setRespawnPosition(helper.getLevel().dimension(), replacement, 0, true, false);
+        helper.assertTrue(HomeDetector.findHome(player, 64) == null, "Forced spawn coordinates without a bed are not home");
+        helper.succeed();
+    }
+
+    @GameTest(template = EMPTY)
+    public static void homeExcludesOtherDimensionsAnchorsAndUnloadedChunks(GameTestHelper helper) {
+        BlockPos bed = placeBed(helper, new BlockPos(1, 2, 1));
+        ServerPlayer player = homePlayer(helper, bed);
+        player.setRespawnPosition(Level.NETHER, bed, 0, false, false);
+        helper.assertTrue(HomeDetector.findHome(player, 64) == null, "Matching coordinates in a different dimension are not home");
+        player.setRespawnPosition(helper.getLevel().dimension(), bed, 0, false, false);
+        helper.getLevel().setBlockAndUpdate(bed, Blocks.RESPAWN_ANCHOR.defaultBlockState());
+        helper.assertTrue(HomeDetector.findHome(player, 64) == null, "Respawn anchors are not beds");
+        BlockPos distant = bed.offset(1_000_000, 0, 1_000_000);
+        player.setRespawnPosition(helper.getLevel().dimension(), distant, 0, false, false);
+        player.setPos(Vec3.atCenterOf(distant));
+        helper.assertTrue(!helper.getLevel().getChunkSource().hasChunk(distant.getX() >> 4, distant.getZ() >> 4),
+            "The test bed chunk must begin unloaded");
+        helper.assertTrue(HomeDetector.findHome(player, 64) == null, "Unloaded bed positions are not sampled");
+        helper.assertTrue(!helper.getLevel().getChunkSource().hasChunk(distant.getX() >> 4, distant.getZ() >> 4),
+            "Home detection must not load chunks");
+        helper.succeed();
+    }
+
+    private static BlockPos placeBed(GameTestHelper helper, BlockPos relativeFoot) {
+        BlockPos foot = helper.absolutePos(relativeFoot);
+        BlockPos head = foot.south();
+        helper.getLevel().setBlock(foot.below(), Blocks.STONE.defaultBlockState(), 2);
+        helper.getLevel().setBlock(head.below(), Blocks.STONE.defaultBlockState(), 2);
+        var state = Blocks.RED_BED.defaultBlockState().setValue(BedBlock.FACING, Direction.SOUTH);
+        helper.getLevel().setBlock(foot, state.setValue(BedBlock.PART, BedPart.FOOT), 2);
+        helper.getLevel().setBlock(head, state.setValue(BedBlock.PART, BedPart.HEAD), 2);
+        return head;
+    }
+
+    private static ServerPlayer homePlayer(GameTestHelper helper, BlockPos bed) {
+        ServerPlayer player = new ServerPlayer(helper.getLevel().getServer(), helper.getLevel(),
+            new GameProfile(UUID.randomUUID(), "PNPHomeTest"), ClientInformation.createDefault());
+        player.setPos(Vec3.atCenterOf(bed));
+        player.setRespawnPosition(helper.getLevel().dimension(), bed, 0, false, false);
+        return player;
     }
 
     private static ResolvedMusic resolved(String track) {

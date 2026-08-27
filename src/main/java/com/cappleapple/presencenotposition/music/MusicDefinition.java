@@ -41,7 +41,7 @@ public record MusicDefinition(
     public int transitionDelayTicks(com.cappleapple.presencenotposition.location.LocationType type) {
         if (this.transitionDelaySeconds != null) return secondsToTicks(this.transitionDelaySeconds);
         return switch (type) {
-            case STRUCTURE -> 10;
+            case STRUCTURE, HOME -> 10;
             case BIOME -> 40;
             case DIMENSION, CUSTOM -> 0;
         };

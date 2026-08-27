@@ -21,6 +21,8 @@ public final class PresenceKubeJSBindings {
     public void biomeExited(IEventHandler listener) { PresenceKubeJSEvents.listen(LocationType.BIOME, false, listener); }
     public void dimensionEntered(IEventHandler listener) { PresenceKubeJSEvents.listen(LocationType.DIMENSION, true, listener); }
     public void dimensionExited(IEventHandler listener) { PresenceKubeJSEvents.listen(LocationType.DIMENSION, false, listener); }
+    public void homeEntered(IEventHandler listener) { PresenceKubeJSEvents.listen(LocationType.HOME, true, listener); }
+    public void homeExited(IEventHandler listener) { PresenceKubeJSEvents.listen(LocationType.HOME, false, listener); }
     public void entered(IEventHandler listener) { PresenceKubeJSEvents.listenUnified(true, listener); }
     public void exited(IEventHandler listener) { PresenceKubeJSEvents.listenUnified(false, listener); }
 

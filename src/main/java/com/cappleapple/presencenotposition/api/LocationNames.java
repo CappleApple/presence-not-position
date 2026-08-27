@@ -14,6 +14,7 @@ public final class LocationNames {
             case BIOME -> "biome";
             case DIMENSION -> "dimension";
             case CUSTOM -> "presencenotposition.custom";
+            case HOME -> "home";
         };
         return prefix + "." + context.id().getNamespace() + "." + context.id().getPath().replace('/', '.');
     }

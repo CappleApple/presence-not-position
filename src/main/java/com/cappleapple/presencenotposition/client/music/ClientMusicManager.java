@@ -46,6 +46,7 @@ public final class ClientMusicManager {
     private static boolean waitingForTitle;
     private static long resourceRevision = -1;
     private static boolean manualStop;
+    private static boolean externalMusicActive;
 
     private ClientMusicManager() {
     }
@@ -64,6 +65,7 @@ public final class ClientMusicManager {
             return;
         }
         long tick = com.cappleapple.presencenotposition.client.ClientPresentationManager.clientTick();
+        externalMusicActive = ExternalMusicController.isPriorityMusicPlaying(minecraft);
         updatePeriod(minecraft, tick);
         ClientResourceIndex.Snapshot resources = ClientResourceIndex.snapshot();
         if (resourceRevision != resources.revision()) {
@@ -88,14 +90,15 @@ public final class ClientMusicManager {
                 finishedChoice.definition().trackDelay().randomTicks(RANDOM),
                 ClientConfig.musicCooldownSeconds(finishedChoice.context().type()));
         }
-        if (!manualStop && winner != null && tick >= scheduledStartTick && !sameChoice(primary, winner)) {
+        if (!externalMusicActive && !manualStop && winner != null && tick >= scheduledStartTick && !sameChoice(primary, winner)) {
             transitionTo(winner, minecraft, tick, resources);
         }
-        if (!manualStop && winner != null && primary == null && scheduledStartTick == Long.MAX_VALUE
+        if (!externalMusicActive && !manualStop && winner != null && primary == null && scheduledStartTick == Long.MAX_VALUE
             && !waitingForTitle && tick >= nextTrackTick && !winner.silence()) {
             startNewPlayback(winner, minecraft, tick, resources, false);
         }
         VanillaMusicController.tick(winner != null && !manualStop);
+        ExternalMusicController.muteLocationMusic(minecraft, externalMusicActive);
     }
 
     private static void updatePeriod(Minecraft minecraft, long tick) {
@@ -298,6 +301,7 @@ public final class ClientMusicManager {
     public static Component debugComponent() {
         if (winner == null) return Component.translatable("commands.presencenotposition.music.none");
         String track = primary == null ? (winner.silence() ? "(intentional silence)" : "(waiting)") : primary.track.toString();
+        if (externalMusicActive) track += " (muted for jukebox/external music)";
         return Component.translatable("commands.presencenotposition.music.current", winner.context().toString(), track);
     }
 
@@ -319,6 +323,7 @@ public final class ClientMusicManager {
         resolvedCandidate = null;
         period = null;
         manualStop = false;
+        externalMusicActive = false;
     }
 
     private record SelectorKey(LocationContext context, DayPeriod period) { }

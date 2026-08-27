@@ -13,12 +13,12 @@ class PresentationStackLayoutTest {
     @Test
     void simultaneousLocationsSortInVisualHierarchy() {
         List<LocationType> types = new ArrayList<>(List.of(
-            LocationType.STRUCTURE, LocationType.DIMENSION, LocationType.BIOME));
+            LocationType.HOME, LocationType.CUSTOM, LocationType.STRUCTURE, LocationType.DIMENSION, LocationType.BIOME));
 
         types.sort((left, right) -> Integer.compare(
             PresentationStackLayout.order(left), PresentationStackLayout.order(right)));
 
-        assertEquals(List.of(LocationType.DIMENSION, LocationType.BIOME, LocationType.STRUCTURE), types);
+        assertEquals(List.of(LocationType.DIMENSION, LocationType.BIOME, LocationType.STRUCTURE, LocationType.HOME, LocationType.CUSTOM), types);
     }
 
     @Test

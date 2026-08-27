@@ -16,7 +16,8 @@ public final class PresentationStackLayout {
             case DIMENSION -> 0;
             case BIOME -> 1;
             case STRUCTURE -> 2;
-            case CUSTOM -> 3;
+            case HOME -> 3;
+            case CUSTOM -> 4;
         };
     }
 

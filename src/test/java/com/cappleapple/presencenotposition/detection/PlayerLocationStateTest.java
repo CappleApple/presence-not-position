@@ -1,12 +1,14 @@
 package com.cappleapple.presencenotposition.detection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.cappleapple.presencenotposition.location.LocationTransition;
 import com.cappleapple.presencenotposition.location.LocationType;
 import java.util.List;
 import java.util.Set;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
@@ -63,6 +65,40 @@ class PlayerLocationStateTest {
             "+BIOME minecraft:desert",
             "+STRUCTURE cataclysm:burning_arena"
         ), describe(state.sample(sample(NETHER, DESERT, ARENA), 1)));
+    }
+
+    @Test
+    void homeEntersOnceExitsAndReentersWithoutChangingOtherContexts() {
+        PlayerLocationState state = new PlayerLocationState(15, 20);
+        BlockPos bed = new BlockPos(10, 64, 10);
+        LocationSample home = new LocationSample(OVERWORLD, PLAINS, Set.of(VILLAGE), bed);
+        state.sample(sample(OVERWORLD, PLAINS, VILLAGE), 0);
+        assertEquals(List.of("+HOME presencenotposition:home"), describe(state.sample(home, 5)));
+        assertEquals(bed, state.home());
+        assertTrue(state.sample(home, 10).isEmpty());
+        assertEquals(List.of("-HOME presencenotposition:home"), describe(state.sample(sample(OVERWORLD, PLAINS, VILLAGE), 15)));
+        assertNull(state.home());
+        assertEquals(List.of("+HOME presencenotposition:home"), describe(state.sample(home, 20)));
+        assertEquals(Set.of(VILLAGE), state.structures());
+    }
+
+    @Test
+    void replacingTheRespawnBedRebuildsHomeEvenInsideBothRadii() {
+        PlayerLocationState state = new PlayerLocationState(15, 20);
+        state.sample(new LocationSample(OVERWORLD, PLAINS, Set.of(), BlockPos.ZERO), 0);
+        assertEquals(List.of("-HOME presencenotposition:home", "+HOME presencenotposition:home"),
+            describe(state.sample(new LocationSample(OVERWORLD, PLAINS, Set.of(), new BlockPos(2, 0, 0)), 5)));
+    }
+
+    @Test
+    void dimensionChangesExitHomeEvenWhenBedCoordinatesAreTheSame() {
+        PlayerLocationState state = new PlayerLocationState(15, 20);
+        state.sample(new LocationSample(OVERWORLD, PLAINS, Set.of(), BlockPos.ZERO), 0);
+        var changes = describe(state.sample(new LocationSample(NETHER, DESERT, Set.of(), BlockPos.ZERO), 1));
+        assertEquals("-HOME presencenotposition:home", changes.getFirst());
+        assertEquals("+HOME presencenotposition:home", changes.getLast());
+        state.sample(sample(OVERWORLD, PLAINS), 2);
+        assertNull(state.home());
     }
 
     private static Set<ResourceLocation> stateAfter(PlayerLocationState state, LocationSample sample, long tick) {
