@@ -13,11 +13,16 @@ import com.cappleapple.presencenotposition.music.MusicSelection;
 import com.cappleapple.presencenotposition.music.MusicTrackSet;
 import com.cappleapple.presencenotposition.music.ResolvedMusic;
 import com.cappleapple.presencenotposition.music.TrackDelay;
+import com.cappleapple.presencenotposition.presentation.EntrySoundSelector;
+import com.cappleapple.presencenotposition.presentation.PresentationOverride;
+import com.cappleapple.presencenotposition.resource.DefinitionParser;
 import com.cappleapple.presencenotposition.server.HomeDetector;
+import com.google.gson.JsonParser;
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -42,6 +47,23 @@ public final class PresenceGameTests {
     private static final String EMPTY = "empty";
 
     private PresenceGameTests() { }
+
+    @GameTest(template = EMPTY)
+    public static void multipleAudioSourcesRemainServerLoadable(GameTestHelper helper) {
+        var definition = DefinitionParser.parse(LocationType.HOME, JsonParser.parseString("""
+            {"music":{"folders":["test:music/home","other:music/home"]},
+             "entrySound":{"ids":["test:intro","other:intro"],"volume":0.5}}
+            """).getAsJsonObject());
+        helper.assertTrue(definition.music().folders().equals(List.of(
+            ResourceLocation.parse("test:music/home"), ResourceLocation.parse("other:music/home"))),
+            "Every configured music source must survive parsing on the server");
+        var selected = EntrySoundSelector.select(
+            List.of(new EntrySoundSelector.Candidate(definition.entrySound(), PresentationOverride.NONE)),
+            sound -> sound.getNamespace().equals("other"), new Random(0)).orElseThrow();
+        helper.assertTrue(selected.id().equals(ResourceLocation.parse("other:intro")) && selected.volume() == 0.5F,
+            "A missing first sound must still allow an available alternative with its configured volume");
+        helper.succeed();
+    }
 
     @GameTest(template = EMPTY)
     public static void currentCommandIsRejected(GameTestHelper helper) {

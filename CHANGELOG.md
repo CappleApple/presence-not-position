@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 - 2026-08-27
+
+### Added
+
+- Multiple music folder paths for generic, day, and night playlists, with duplicate tracks removed and existing single-path definitions preserved.
+- Multiple entrance sound IDs, choosing one available variant per entrance and skipping missing sounds.
+
 ## 1.1.1 - 2026-08-27
 
 ### Changed

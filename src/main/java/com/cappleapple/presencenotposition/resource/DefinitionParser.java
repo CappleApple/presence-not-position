@@ -67,18 +67,19 @@ public final class DefinitionParser {
     }
 
     private static EntrySoundDefinition parseSound(JsonObject json) {
+        List<ResourceLocation> ids = resources(json, "id", "ids");
+        if (ids.isEmpty()) throw new IllegalArgumentException("entrySound requires at least one sound ID");
         return new EntrySoundDefinition(
-            id(GsonHelper.getAsString(json, "id")),
+            ids.getFirst(),
             GsonHelper.getAsFloat(json, "volume", 1.0F),
-            GsonHelper.getAsFloat(json, "pitch", 1.0F)
+            GsonHelper.getAsFloat(json, "pitch", 1.0F),
+            ids
         );
     }
 
     private static MusicDefinition parseMusic(JsonObject json) {
         return new MusicDefinition(
-            resource(json, "folder"),
-            resource(json, "dayFolder"),
-            resource(json, "nightFolder"),
+            null, null, null,
             GsonHelper.getAsFloat(json, "volume", 1.0F),
             GsonHelper.getAsBoolean(json, "normalizeVolume", false),
             GsonHelper.getAsDouble(json, "normalizationTarget", -16.0),
@@ -94,7 +95,10 @@ public final class DefinitionParser {
             json.has("transitionDelay") ? GsonHelper.getAsDouble(json, "transitionDelay") : null,
             GsonHelper.getAsBoolean(json, "resume", true),
             GsonHelper.getAsBoolean(json, "silenceLowerPriority", false),
-            GsonHelper.getAsInt(json, "priority", 0)
+            GsonHelper.getAsInt(json, "priority", 0),
+            resources(json, "folder", "folders"),
+            resources(json, "dayFolder", "dayFolders"),
+            resources(json, "nightFolder", "nightFolders")
         );
     }
 
@@ -118,9 +122,20 @@ public final class DefinitionParser {
         return parent.has(key) && !parent.get(key).isJsonNull() ? parent.get(key).getAsString() : null;
     }
 
-    @Nullable
-    private static ResourceLocation resource(JsonObject parent, String key) {
-        return parent.has(key) ? id(GsonHelper.getAsString(parent, key)) : null;
+    private static List<ResourceLocation> resources(JsonObject parent, String singular, String plural) {
+        List<ResourceLocation> result = new ArrayList<>();
+        for (String key : List.of(singular, plural)) {
+            JsonElement value = parent.get(key);
+            if (value == null || value.isJsonNull()) continue;
+            Iterable<JsonElement> values = value.isJsonArray() ? value.getAsJsonArray() : List.of(value);
+            for (JsonElement element : values) {
+                if (!element.isJsonPrimitive() || !element.getAsJsonPrimitive().isString()) {
+                    throw new IllegalArgumentException(key + " must contain only resource-location strings");
+                }
+                result.add(id(element.getAsString()));
+            }
+        }
+        return result.stream().distinct().toList();
     }
 
     private static ResourceLocation id(String value) {

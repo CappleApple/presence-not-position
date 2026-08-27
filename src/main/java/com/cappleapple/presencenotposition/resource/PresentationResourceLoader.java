@@ -98,19 +98,18 @@ public final class PresentationResourceLoader extends SimplePreparableReloadList
         return new LocationContext(type, ResourceLocation.fromNamespaceAndPath(namespace, path));
     }
 
-    private static Map<LocationContext, ResolvedMusic> resolveMusic(
+    static Map<LocationContext, ResolvedMusic> resolveMusic(
         Map<LocationContext, PresentationDefinition> definitions,
         Set<ResourceLocation> allTracks
     ) {
         Map<LocationContext, ResolvedMusic> result = new HashMap<>();
         definitions.forEach((context, definition) -> {
             if (definition.music() == null) return;
-            List<ResourceLocation> day = matching(definition.music().dayFolder(), allTracks, List.of());
-            List<ResourceLocation> night = matching(definition.music().nightFolder(), allTracks, List.of());
+            List<ResourceLocation> day = matching(definition.music().dayFolders(), allTracks, List.of());
+            List<ResourceLocation> night = matching(definition.music().nightFolders(), allTracks, List.of());
             List<ResourceLocation> generic = matching(
-                definition.music().folder(), allTracks,
-                java.util.stream.Stream.of(definition.music().dayFolder(), definition.music().nightFolder())
-                    .filter(java.util.Objects::nonNull).toList()
+                definition.music().folders(), allTracks,
+                java.util.stream.Stream.concat(definition.music().dayFolders().stream(), definition.music().nightFolders().stream()).toList()
             );
             MusicTrackSet tracks = new MusicTrackSet(generic, day, night);
             if (tracks.isEmpty() && definition.music().hasFolder() && !definition.music().silenceLowerPriority()) {
@@ -122,15 +121,14 @@ public final class PresentationResourceLoader extends SimplePreparableReloadList
     }
 
     private static List<ResourceLocation> matching(
-        ResourceLocation folder,
+        List<ResourceLocation> folders,
         Set<ResourceLocation> allTracks,
         List<ResourceLocation> excludedPrefixes
     ) {
-        if (folder == null) return List.of();
-        return allTracks.stream()
-            .filter(track -> isUnder(track, folder))
+        return folders.stream()
+            .flatMap(folder -> allTracks.stream().filter(track -> isUnder(track, folder)).sorted())
             .filter(track -> excludedPrefixes.stream().noneMatch(prefix -> isUnder(track, prefix)))
-            .sorted()
+            .distinct()
             .toList();
     }
 

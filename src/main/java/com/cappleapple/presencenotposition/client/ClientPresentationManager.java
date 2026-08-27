@@ -23,10 +23,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvent;
 
@@ -83,7 +85,12 @@ public final class ClientPresentationManager {
             .map(ClientPresentationManager::start)
             .map(active -> new EntrySoundSelector.Candidate(active.definition().entrySound(), active.override()))
             .toList();
-        EntrySoundSelector.select(sounds).ifPresent(ClientPresentationManager::playEntrySound);
+        SoundManager soundManager = Minecraft.getInstance().getSoundManager();
+        EntrySoundSelector.select(sounds, id -> {
+            if (id.equals(SoundManager.INTENTIONALLY_EMPTY_SOUND_LOCATION)) return true;
+            var event = soundManager.getSoundEvent(id);
+            return event != null && event.getWeight() > 0;
+        }, ThreadLocalRandom.current()).ifPresent(ClientPresentationManager::playEntrySound);
     }
 
     private static Active start(Pending pending) {

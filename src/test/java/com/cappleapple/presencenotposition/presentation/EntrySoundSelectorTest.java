@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.cappleapple.presencenotposition.location.LocationType;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
+import java.util.Set;
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
@@ -77,6 +79,39 @@ class EntrySoundSelectorTest {
     void separateBatchesDoNotSuppressEachOther() {
         assertEquals(DIMENSION, EntrySoundSelector.select(List.of(candidate(DIMENSION))).orElseThrow());
         assertEquals(BIOME, EntrySoundSelector.select(List.of(candidate(BIOME))).orElseThrow());
+    }
+
+    @Test
+    void variantsSkipMissingSoundsAndDuplicateIdsWithoutLayering() {
+        var definition = new EntrySoundDefinition(id("missing"), 0.4F, 1.3F,
+            List.of(id("first"), id("second"), id("first")));
+        var available = Set.of(id("first"), id("second"));
+        Random pickLast = new Random(0) {
+            @Override public int nextInt(int bound) {
+                assertEquals(2, bound, "Only two unique available variants should be eligible");
+                return bound - 1;
+            }
+        };
+        assertEquals(new EntrySoundDefinition(id("second"), 0.4F, 1.3F),
+            EntrySoundSelector.select(List.of(candidate(definition), candidate(BIOME)), available::contains, pickLast).orElseThrow());
+    }
+
+    @Test
+    void whollyMissingTopRowFallsThroughToTheNextAvailableRow() {
+        var requests = List.of(candidate(DIMENSION), candidate(BIOME), candidate(STRUCTURE));
+        assertEquals(BIOME, EntrySoundSelector.select(requests,
+            sound -> !sound.equals(DIMENSION.id()), new Random(0)).orElseThrow());
+        assertTrue(EntrySoundSelector.select(requests, ignored -> false, new Random(0)).isEmpty());
+    }
+
+    @Test
+    void scriptOverrideReplacesTheWholeVariantList() {
+        var definition = new EntrySoundDefinition(id("first"), 0.4F, 1.3F, List.of(id("second")));
+        var top = new EntrySoundSelector.Candidate(definition, override("scripted"));
+        assertEquals(new EntrySoundDefinition(id("scripted"), 0.4F, 1.3F),
+            EntrySoundSelector.select(List.of(top, candidate(BIOME)), ignored -> true, new Random(0)).orElseThrow());
+        assertEquals(BIOME, EntrySoundSelector.select(List.of(top, candidate(BIOME)),
+            sound -> !sound.equals(id("scripted")), new Random(0)).orElseThrow());
     }
 
     private static EntrySoundSelector.Candidate candidate(EntrySoundDefinition sound) {

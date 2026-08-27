@@ -131,7 +131,36 @@ Individual files use:
 }
 ```
 
-Entry stings are ordinary Minecraft sound events declared by a pack’s `sounds.json`; they are played separately from music. A simultaneous title batch plays only the topmost entry that defines a sound: dimension before biome before structure before home (then custom entries). Rows without a sound are skipped, script sound overrides are respected, and every title still appears. Within one category, the first sound in the title stack's priority/ID order wins.
+Entry stings are ordinary Minecraft sound events declared by a pack’s `sounds.json`; they are played separately from music. A simultaneous title batch plays only the topmost entry with an available sound: dimension before biome before structure before home (then custom entries). Rows without an available sound are skipped, script sound overrides are respected, and every title still appears. Within one category, the first available sound definition in the title stack's priority/ID order wins.
+
+### Multiple music and sound paths
+
+Music `folder`, `dayFolder`, and `nightFolder`, plus `entrySound.id`, accept either one string or an array. The plural names `folders`, `dayFolders`, `nightFolders`, and `ids` are also supported. For example, any structure, biome, dimension, or home presentation can use:
+
+```json
+{
+  "entrySound": {
+    "ids": ["within:location.home_intro", "another_pack:location.welcome"],
+    "volume": 0.7,
+    "pitch": 1.0
+  },
+  "music": {
+    "folders": ["within:music/home", "shared:music/peaceful"],
+    "dayFolders": ["within:music/home/day", "shared:music/peaceful/day"],
+    "nightFolders": ["within:music/home/night", "shared:music/peaceful/night"],
+    "selection": "shuffle",
+    "startAfterTitle": true
+  }
+}
+```
+
+Existing definitions such as `"folder": "within:music/home"` still work. You can also change that value directly to `"folder": ["within:music/home", "shared:music/peaceful"]`. If singular and plural names are both present, their values are combined, singular first, with duplicates removed.
+
+Music paths may use different resource namespaces. Tracks from all configured paths form one playlist; duplicate IDs from overlapping paths appear only once. For sequential playback, paths are visited in the listed order and tracks within each path are sorted by resource ID. Shuffle and random selection use the combined collection. Every configured day/night prefix is excluded from the generic playlist, and missing paths do not prevent other sources from playing or normal period/location fallback. Normal resource-pack precedence still determines which file supplies a repeated resource ID.
+
+Entrance sound IDs form a pool of alternatives: one available ID is chosen randomly for the selected title row, using its configured volume and pitch. They do not play simultaneously. Missing sound events or events without playable files are skipped; if a row has no available variants, selection continues to the next row. A script's sound override replaces the entire pool with its requested ID. Custom presentations also support entry-sound pools.
+
+These are Minecraft resource paths, not operating-system paths. Music prefixes omit `assets/<namespace>/sounds/` and `.ogg`; entry sounds remain sound-event IDs declared in `sounds.json`. Reload resource packs with `/pnp music reload` after editing definitions or adding files.
 
 ## Respawn-bed home
 
@@ -368,6 +397,6 @@ $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-21'
 .\gradlew.bat runServer
 ```
 
-The test suite covers independent overlapping structures, piece-gap grace, biome stability, dimension rebuilds, home entry/exit and bed changes, optional Instanced Not Infinite title suppression, all presentation policies, animation semantics, music specificity/fallback/silence, interruption audibility and reversible muting, day/night sets, track selectors, delay parsing, resource-path resolution, and cached normalization metadata. GameTests also verify real respawn-bed sampling, radius boundaries, bed removal, dimension checks, and avoiding chunk loads. GameTests use the `presencenotposition` namespace so optional mods do not add their own tests to the run; the empty test template is a development fixture and is excluded from the release JAR.
+The test suite covers independent overlapping structures, piece-gap grace, biome stability, dimension rebuilds, home entry/exit and bed changes, optional Instanced Not Infinite title suppression, all presentation policies, animation semantics, music specificity/fallback/silence, interruption audibility and reversible muting, day/night sets, track selectors, combined folder discovery, entry-sound pools, delay parsing, resource-path resolution, and cached normalization metadata. GameTests also verify real respawn-bed sampling, radius boundaries, bed removal, dimension checks, avoiding chunk loads, and server-safe audio-definition parsing. GameTests use the `presencenotposition` namespace so optional mods do not add their own tests to the run; the empty test template is a development fixture and is excluded from the release JAR.
 
 The home context uses network protocol version 2; update the mod on both server and clients together.
