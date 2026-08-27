@@ -342,12 +342,11 @@ For custom requests only, `respectClientPolicy: false` bypasses the client’s c
 Server-aware commands:
 
 ```text
-/pnp current
 /pnp debug
 /pnp title <structure|biome|dimension|home|custom> <namespace:id>
 ```
 
-`/pnp current` includes the active home-bed coordinates. `/pnp title home presencenotposition:home` previews the home presentation (subject to client policy). `debug` and `title` require permission level 2. Client music/history commands are:
+`/pnp title home presencenotposition:home` previews the home presentation (subject to client policy). `debug` and `title` require permission level 2. Client music/history commands are:
 
 ```text
 /pnp music current

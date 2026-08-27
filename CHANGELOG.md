@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 - 2026-08-27
+
+### Changed
+
+- Removed the `/pnp current` location-report command.
+
 ## 1.1.0 - 2026-08-27
 
 ### Added

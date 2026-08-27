@@ -15,6 +15,7 @@ import com.cappleapple.presencenotposition.music.ResolvedMusic;
 import com.cappleapple.presencenotposition.music.TrackDelay;
 import com.cappleapple.presencenotposition.server.HomeDetector;
 import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,6 +42,23 @@ public final class PresenceGameTests {
     private static final String EMPTY = "empty";
 
     private PresenceGameTests() { }
+
+    @GameTest(template = EMPTY)
+    public static void currentCommandIsRejected(GameTestHelper helper) {
+        var server = helper.getLevel().getServer();
+        var dispatcher = server.getCommands().getDispatcher();
+        try {
+            dispatcher.execute("pnp current", server.createCommandSourceStack());
+            helper.fail("The removed location-report command must not execute");
+        } catch (CommandSyntaxException exception) {
+            helper.assertTrue(exception.getType() == CommandSyntaxException.BUILT_IN_EXCEPTIONS.dispatcherUnknownArgument(),
+                "The removed command must be rejected as unknown, without accessing a player's location state");
+        }
+        var pnp = dispatcher.getRoot().getChild("pnp");
+        helper.assertTrue(pnp.getChild("debug") != null && pnp.getChild("title") != null,
+            "The remaining server commands must stay registered");
+        helper.succeed();
+    }
 
     @GameTest(template = EMPTY)
     public static void overlappingStructuresRemainIndependent(GameTestHelper helper) {

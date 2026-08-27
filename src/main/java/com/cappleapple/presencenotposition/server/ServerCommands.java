@@ -1,6 +1,5 @@
 package com.cappleapple.presencenotposition.server;
 
-import com.cappleapple.presencenotposition.detection.PlayerLocationState;
 import com.cappleapple.presencenotposition.location.LocationContext;
 import com.cappleapple.presencenotposition.location.LocationTransition;
 import com.cappleapple.presencenotposition.location.LocationType;
@@ -25,7 +24,6 @@ public final class ServerCommands {
 
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("pnp")
-            .then(Commands.literal("current").executes(context -> current(context.getSource().getPlayerOrException())))
             .then(Commands.literal("debug").requires(source -> source.hasPermission(2))
                 .executes(context -> toggleDebug(context.getSource().getPlayerOrException())))
             .then(Commands.literal("title").requires(source -> source.hasPermission(2))
@@ -40,21 +38,6 @@ public final class ServerCommands {
                             LocationType.parse(StringArgumentType.getString(context, "type")),
                             ResourceLocationArgument.getId(context, "id")
                         ))))));
-    }
-
-    private static int current(ServerPlayer player) {
-        PlayerLocationState state = ServerLocationTracker.state(player);
-        if (state == null) {
-            player.sendSystemMessage(Component.literal("Presence Not Position has not sampled this player yet."));
-            return 0;
-        }
-        player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.dimension", state.dimension()));
-        player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.biome", state.biome()));
-        String structures = state.structures().isEmpty() ? "(none)" : String.join(", ", state.structures().stream().map(ResourceLocation::toString).sorted().toList());
-        player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.structures", structures));
-        player.sendSystemMessage(Component.translatable("commands.presencenotposition.current.home",
-            state.home() == null ? "(outside home)" : state.home().toShortString()));
-        return 1;
     }
 
     private static int toggleDebug(ServerPlayer player) {

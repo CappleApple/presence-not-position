@@ -1,8 +1,4 @@
 {
-  "commands.presencenotposition.current.dimension": "Current Dimension: %s",
-  "commands.presencenotposition.current.biome": "Current Biome: %s",
-  "commands.presencenotposition.current.structures": "Current Structures: %s",
-  "commands.presencenotposition.current.home": "Current Home: %s",
   "commands.presencenotposition.debug.enabled": "Presence Not Position debug output enabled",
   "commands.presencenotposition.debug.disabled": "Presence Not Position debug output disabled",
   "commands.presencenotposition.title.sent": "Sent presentation for %s %s",
