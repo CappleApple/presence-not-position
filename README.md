@@ -13,7 +13,7 @@ With no presentation resources installed, every registry-backed location still g
 
 Install the mod on the server and participating clients. Client title and music settings never gate server detection or KubeJS events.
 
-When **Instanced Not Infinite** is installed, automatic dimension titles and their entry sounds are skipped for its temporary `instancednotinfinite:instances/<id>` dimensions. Biome and structure titles, location events, and dimension music remain unchanged. Explicit `/pnp title` requests and scripted custom presentations still work. Instanced Not Infinite is optional; without it, all dimensions retain their normal presentation behavior.
+When **Instanced Not Infinite** is installed, its temporary `instancednotinfinite:instances/<id>` dimensions show only automatic structure titles and entry sounds. Automatic dimension, biome, and home presentations are skipped. All location contexts remain synchronized, so structure, biome, dimension, and home music resolve normally. Explicit `/pnp title` requests and scripted custom presentations still work. Instanced Not Infinite is optional; without it, all locations retain their normal presentation behavior.
 
 ## Resource-pack layout
 

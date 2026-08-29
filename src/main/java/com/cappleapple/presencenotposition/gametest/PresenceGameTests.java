@@ -137,14 +137,24 @@ public final class PresenceGameTests {
             "Logging in inside an instance must still enter all three location contexts");
         helper.assertTrue(state.dimension().equals(instance), "The actual instance dimension must remain tracked");
         boolean modLoaded = ModList.get().isLoaded("instancednotinfinite");
-        helper.assertTrue(InstancedNotInfiniteCompatibility.suppressAutomaticTitle(dimension) == modLoaded,
-            "Instance titles must be suppressed only when Instanced Not Infinite is loaded");
-        helper.assertTrue(!InstancedNotInfiniteCompatibility.suppressAutomaticTitle(biome)
-            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(structure),
-            "Biome and structure titles must remain available inside instances");
-        var music = MusicContextResolver.resolve(Set.of(dimension, biome, structure), Map.of(dimension, resolved("instance")),
+        helper.assertTrue(InstancedNotInfiniteCompatibility.suppressAutomaticTitle(instance, dimension) == modLoaded
+            && InstancedNotInfiniteCompatibility.suppressAutomaticTitle(instance, biome) == modLoaded,
+            "Instance dimension and biome titles must be suppressed only when Instanced Not Infinite is loaded");
+        helper.assertTrue(!InstancedNotInfiniteCompatibility.suppressAutomaticTitle(instance, structure),
+            "Structure titles must remain available inside instances");
+        Set<LocationContext> active = Set.of(dimension, biome, structure);
+        var structureMusic = MusicContextResolver.resolve(active, Map.of(
+            dimension, resolved("dimension"), biome, resolved("biome"), structure, resolved("structure")),
             ignored -> true, DayPeriod.DAY).orElseThrow();
-        helper.assertTrue(music.context().equals(dimension), "Suppressing the title must not remove dimension music fallback");
+        var biomeMusic = MusicContextResolver.resolve(active, Map.of(
+            dimension, resolved("dimension"), biome, resolved("biome")),
+            ignored -> true, DayPeriod.DAY).orElseThrow();
+        var dimensionMusic = MusicContextResolver.resolve(active, Map.of(dimension, resolved("dimension")),
+            ignored -> true, DayPeriod.DAY).orElseThrow();
+        helper.assertTrue(structureMusic.context().equals(structure)
+            && biomeMusic.context().equals(biome)
+            && dimensionMusic.context().equals(dimension),
+            "Instance title suppression must preserve structure, biome, and dimension music fallback");
         helper.succeed();
     }
 
@@ -160,7 +170,7 @@ public final class PresenceGameTests {
         var enteredDimension = changes.stream().filter(change -> change.entered()
             && change.context().type() == LocationType.DIMENSION).findFirst().orElseThrow();
         helper.assertTrue(enteredDimension.context().id().equals(id("overworld"))
-            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(enteredDimension.context()),
+            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(id("overworld"), enteredDimension.context()),
             "Returning to the overworld must retain its normal automatic dimension title");
         helper.succeed();
     }

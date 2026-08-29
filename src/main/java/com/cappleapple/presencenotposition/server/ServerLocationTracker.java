@@ -87,7 +87,8 @@ public final class ServerLocationTracker {
             PresenceNotPosition.LOGGER.error("Location integration failed for {}", transition.context(), exception);
         }
         if (transition.entered() && !event.presentationCancelled()
-            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(transition.context())) {
+            && !InstancedNotInfiniteCompatibility.suppressAutomaticTitle(
+                player.serverLevel().dimension().location(), transition.context())) {
             PresentationService.show(player, transition.context(), event.override());
         }
         ServerCommands.debugTransition(player, transition);

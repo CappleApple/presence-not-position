@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1 - 2026-08-28
+
+### Fixed
+
+- Instanced Not Infinite temporary dimensions now show only automatic structure titles and entry sounds while retaining normal structure, biome, dimension, and home music resolution.
+
 ## 1.2.0 - 2026-08-27
 
 ### Added

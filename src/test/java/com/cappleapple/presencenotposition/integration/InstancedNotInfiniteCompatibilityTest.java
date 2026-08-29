@@ -9,47 +9,55 @@ import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;
 
 class InstancedNotInfiniteCompatibilityTest {
-    private static final String INSTANCE = "instancednotinfinite:instances/0123456789abcdef0123456789abcdef";
+    private static final ResourceLocation INSTANCE = id("instancednotinfinite:instances/0123456789abcdef0123456789abcdef");
 
     @Test
-    void temporaryInstanceDimensionTitlesAreSuppressedWhenModIsLoaded() {
-        assertTrue(suppressed(LocationType.DIMENSION, INSTANCE, true));
-        assertTrue(suppressed(LocationType.DIMENSION, "instancednotinfinite:instances/another_instance", true));
+    void instanceSuppressesAutomaticDimensionBiomeAndHomePresentations() {
+        assertTrue(suppressed(INSTANCE, LocationType.DIMENSION, "instancednotinfinite:instances/another_instance", true));
+        assertTrue(suppressed(INSTANCE, LocationType.BIOME, "minecraft:plains", true));
+        assertTrue(suppressed(INSTANCE, LocationType.HOME, "minecraft:bed", true));
+    }
+
+    @Test
+    void instanceRetainsStructureAndExplicitCustomPresentations() {
+        assertFalse(suppressed(INSTANCE, LocationType.STRUCTURE, "minecraft:ancient_city", true));
+        assertFalse(suppressed(INSTANCE, LocationType.CUSTOM, "example:warning", true));
     }
 
     @Test
     void absentModLeavesEveryPresentationUntouched() {
         for (LocationType type : LocationType.values()) {
-            assertFalse(suppressed(type, INSTANCE, false));
+            assertFalse(suppressed(INSTANCE, type, "minecraft:test", false));
         }
     }
 
     @Test
-    void biomeStructureAndCustomTitlesAreNotSuppressed() {
-        for (LocationType type : new LocationType[] {LocationType.BIOME, LocationType.STRUCTURE, LocationType.CUSTOM}) {
-            assertFalse(suppressed(type, INSTANCE, true));
-        }
-        assertFalse(suppressed(LocationType.BIOME, "minecraft:plains", true));
-        assertFalse(suppressed(LocationType.STRUCTURE, "minecraft:ancient_city", true));
-    }
-
-    @Test
-    void vanillaAndOtherModDimensionsAreNotSuppressed() {
-        for (String id : new String[] {"minecraft:overworld", "minecraft:the_nether", "minecraft:the_end",
-            "other_mod:instances/0123456789abcdef0123456789abcdef", "other_mod:dungeon"}) {
-            assertFalse(suppressed(LocationType.DIMENSION, id, true), id);
+    void normalDimensionsLeaveEveryPresentationUntouched() {
+        for (LocationType type : LocationType.values()) {
+            assertFalse(suppressed(id("minecraft:overworld"), type, "minecraft:test", true));
         }
     }
 
     @Test
-    void otherInstancedNotInfiniteDimensionsAreNotSuppressed() {
-        for (String path : new String[] {"lobby", "instances", "instances/", "instances_extra/example", "other/instances/example"}) {
-            assertFalse(suppressed(LocationType.DIMENSION, "instancednotinfinite:" + path, true), path);
+    void onlyTemporaryInstancedNotInfiniteDimensionsActivateTheFilter() {
+        for (String dimension : new String[] {"instancednotinfinite:lobby", "instancednotinfinite:instances",
+            "instancednotinfinite:instances/", "instancednotinfinite:instances_extra/example",
+            "other_mod:instances/0123456789abcdef0123456789abcdef"}) {
+            assertFalse(suppressed(id(dimension), LocationType.BIOME, "minecraft:plains", true), dimension);
         }
     }
 
-    private static boolean suppressed(LocationType type, String id, boolean modLoaded) {
+    private static boolean suppressed(
+        ResourceLocation currentDimension,
+        LocationType type,
+        String contextId,
+        boolean modLoaded
+    ) {
         return InstancedNotInfiniteCompatibility.suppressAutomaticTitle(
-            new LocationContext(type, ResourceLocation.parse(id)), modLoaded);
+            currentDimension, new LocationContext(type, id(contextId)), modLoaded);
+    }
+
+    private static ResourceLocation id(String value) {
+        return ResourceLocation.parse(value);
     }
 }
